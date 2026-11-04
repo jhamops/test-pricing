@@ -24,9 +24,11 @@ export const REGLA_INICIAL = {
         { hasta: 150, pct: 37 },
         { hasta: null, pct: 27 },
     ],
+    porDocenaOn: true, // ¿se saca precio por docena? (opcional)
     docenaHasta: 18, // lo que cuesta menos que esto se vende por docena y suelto
     recargoSuelto: 15, // el suelto, este % más que la unidad por docena
     redondeoAlSolDesde: 10, // desde este precio se redondea al sol (antes, a 10 céntimos)
+    terminaEn8On: true, // ¿lo caro termina en 8? (opcional: es decisión de cada negocio)
     terminaEn8Desde: 100, // desde este precio termina en 8
     ajustes: { competencia: -10, rentable: 15 }, // puntos que se restan o suman al %
     conFactura: true, // compra con factura y paga IGV: la ganancia se mide sin IGV
@@ -49,7 +51,7 @@ export function terminadoEn8(x) {
 
 /** El precio redondeado como lo haría ella, según cuánto es. */
 export function redondearPrecio(x, regla) {
-    if (x >= regla.terminaEn8Desde) return terminadoEn8(x);
+    if (regla.terminaEn8On !== false && x >= regla.terminaEn8Desde) return terminadoEn8(x);
     if (x >= regla.redondeoAlSolDesde) return Math.round(x);
     return redondear(x, 0.1);
 }
@@ -79,9 +81,11 @@ export function calcular({ costo, flete = 0, ajuste = 'normal' }, regla) {
     const pct = porcentajeDe(c, regla, ajuste);
     const comisionPct = (Number(regla.tarjeta) || 0) / 100;
     const t = regla.tarjetaSiempre === false ? 0 : comisionPct;
-    // Costo + ganancia, y encima lo que se lleva la tarjeta (dividiendo, no sumando).
-    const conPct = (base * (1 + pct / 100)) / (1 - t);
-    const porDocena = c < regla.docenaHasta;
+    // Costo + ganancia; el flete se suma tal cual (no se le gana encima, como en su
+    // cuaderno: 100 + 30 % + 2 de flete = 132); y encima lo que se lleva la tarjeta
+    // (dividiendo, no sumando: la comisión se cobra sobre el precio final).
+    const conPct = (c * (1 + pct / 100) + f) / (1 - t);
+    const porDocena = regla.porDocenaOn !== false && c < regla.docenaHasta;
     let docenaUnidad = null, suelto;
     if (porDocena) {
         docenaUnidad = redondear(conPct, 0.1);

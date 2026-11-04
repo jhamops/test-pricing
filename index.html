@@ -100,7 +100,8 @@
                 <div class="escalones" id="regla-escalera"></div>
 
                 <h3><span class="paso">2</span> Docena y suelto</h3>
-                <div class="linea-regla">
+                <label class="interruptor"><input type="checkbox" id="regla-docena-on"> Saco precio <b>por docena</b> (además del suelto)</label>
+                <div class="linea-regla" id="linea-docena">
                     <span>Lo que te cuesta menos de</span>
                     <span class="con-sol mini"><span aria-hidden="true">S/</span><input id="regla-docena" inputmode="decimal" aria-label="Se vende por docena si cuesta menos de"></span>
                     <span>se vende <b>por docena</b>; el <b>suelto</b> cuesta</span>
@@ -110,6 +111,8 @@
                 <p class="ejemplo" id="ej-docena"></p>
 
                 <h3><span class="paso">3</span> Cómo redondeas</h3>
+                <label class="interruptor"><input type="checkbox" id="regla-8-on"> Lo caro <b>termina en 8</b> <small>(opcional)</small></label>
+                <p class="ejemplo">Busca el precio terminado en 8 más cercano: <b>S/ 200 → S/ 198</b>, S/ 203.85 → S/ 208, S/ 196.25 → S/ 198. El cliente ve «198 y no 200»: ya trae su rebaja y no pide que le bajes un sol más. A veces sube unos soles, a veces baja.</p>
                 <div class="linea-regla">
                     <span>Hasta</span>
                     <span class="con-sol mini"><span aria-hidden="true">S/</span><input id="regla-al-sol" inputmode="decimal" aria-label="Desde qué precio se redondea al sol"></span>

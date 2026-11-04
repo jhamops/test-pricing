@@ -112,3 +112,23 @@ test('texto para copiar', () => {
     ], marzo);
     assert.equal(t, 'Cono · docena S/ 56.40 (S/ 4.70 c/u) · suelto S/ 5.50 · clave 03 3 26 57\nGuitarra · precio S/ 208.00 · clave 03 160 26 27');
 });
+
+test('el flete se suma tal cual, sin ganancia encima (su ejemplo: 100 + 30 % + 2 = 132)', () => {
+    const suya = { ...SIN_TARJETA, escalera: [{ hasta: null, pct: 30 }], porDocenaOn: false, terminaEn8On: false };
+    assert.equal(calcular({ costo: 100, flete: 2 }, suya).suelto, 132);
+    // Con la tarjeta siempre adentro: 132 / 0.97 = 136.08 → 136.
+    assert.equal(calcular({ costo: 100, flete: 2 }, { ...suya, tarjetaSiempre: true }).suelto, 136);
+});
+
+test('terminar en 8 es opcional', () => {
+    assert.equal(redondearPrecio(203.85, R), 208);
+    assert.equal(redondearPrecio(203.85, { ...R, terminaEn8On: false }), 204); // al sol
+});
+
+test('sacar precio por docena es opcional', () => {
+    assert.equal(calcular({ costo: 3 }, R).porDocena, true);
+    const sinDocena = calcular({ costo: 3 }, { ...R, porDocenaOn: false });
+    assert.equal(sinDocena.porDocena, false);
+    assert.equal(sinDocena.docena, null);
+    assert.equal(sinDocena.suelto, 4.9); // 3 × 1.57 / 0.97 = 4.86 → un solo precio
+});

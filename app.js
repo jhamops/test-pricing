@@ -129,7 +129,7 @@ function htmlResultado(p) {
     if (!r) return '<p class="falta">Escribe lo que costó.</p>';
     const siempre = conTarjetaSiempre();
     const avisarTarjeta = !siempre && Number(estado.regla.tarjeta) > 0;
-    const termina8 = !r.porDocena && r.sinRedondear >= estado.regla.terminaEn8Desde && Math.abs(r.sinRedondear - r.suelto) >= 0.5;
+    const termina8 = !r.porDocena && estado.regla.terminaEn8On !== false && r.sinRedondear >= estado.regla.terminaEn8Desde && Math.abs(r.sinRedondear - r.suelto) >= 0.5;
     return `
         <p class="por-que">Costó ${rango(escalonDe(Number(p.costo), estado.regla))}: le sumas <b>${r.porcentaje} %</b>${p.ajuste === 'competencia' ? ' (con competencia)' : p.ajuste === 'rentable' ? ' (rentable)' : ''}${siempre ? ` + <b>${estado.regla.tarjeta} %</b> de tarjeta` : ''}</p>
         <div class="precios">
@@ -329,8 +329,9 @@ function pintarEjemplos() {
     const barato = calcular({ costo: 3 }, R);
     $('ej-docena').innerHTML = barato.porDocena
         ? `Ej.: costó ${soles(3)} → la docena a ${soles(barato.docena)} (${soles(barato.docenaUnidad)} c/u) y suelto ${soles(barato.suelto)}.`
-        : 'Con S/ 0 nada se vende por docena.';
-    $('ej-redondeo').innerHTML = `Ej.: ${soles(4.36)} → <b>${soles(redondearPrecio(4.36, R))}</b> · ${soles(64.7)} → <b>${soles(redondearPrecio(64.7, R))}</b> · ${soles(200)} → <b>${soles(redondearPrecio(200, R))}</b> <small>(en vez de 200: ya trae su rebaja y no se rebaja más)</small>`;
+        : 'No sacas precio por docena: cada producto tiene un solo precio.';
+    const con8 = R.terminaEn8On !== false;
+    $('ej-redondeo').innerHTML = `Ej.: ${soles(4.36)} → <b>${soles(redondearPrecio(4.36, R))}</b> · ${soles(64.7)} → <b>${soles(redondearPrecio(64.7, R))}</b> · ${soles(203.85)} → <b>${soles(redondearPrecio(203.85, R))}</b>${con8 ? ' <small>(termina en 8)</small>' : ' <small>(al sol: sin el 8)</small>'}`;
     const n = calcular({ costo: 12 }, R), c = calcular({ costo: 12, ajuste: 'competencia' }, R), r = calcular({ costo: 12, ajuste: 'rentable' }, R);
     $('ej-ajuste').innerHTML = `Ej.: costó ${soles(12)} → normal ${soles(n.docenaUnidad ?? n.suelto)}, con competencia ${soles(c.docenaUnidad ?? c.suelto)}, rentable ${soles(r.docenaUnidad ?? r.suelto)} c/u. Se elige en cada producto, con un toque.`;
 }
@@ -338,6 +339,9 @@ function pintarRegla() {
     const R = estado.regla;
     pintarEscalera(); pintarEjemplos();
     $('regla-docena').value = R.docenaHasta;
+    $('regla-docena-on').checked = R.porDocenaOn !== false;
+    $('regla-8-on').checked = R.terminaEn8On !== false;
+    $('linea-docena').hidden = R.porDocenaOn === false;
     $('regla-suelto').value = R.recargoSuelto;
     $('regla-al-sol').value = R.redondeoAlSolDesde;
     $('regla-en-8').value = R.terminaEn8Desde;
@@ -352,6 +356,8 @@ dRegla.addEventListener('input', (e) => {
     const t = e.target, R = estado.regla;
     if (t.dataset.e != null) R.escalera[Number(t.dataset.e)].pct = num(t.value);
     else if (t.id === 'regla-docena') R.docenaHasta = num(t.value);
+    else if (t.id === 'regla-docena-on') { R.porDocenaOn = t.checked; $('linea-docena').hidden = !t.checked; }
+    else if (t.id === 'regla-8-on') R.terminaEn8On = t.checked;
     else if (t.id === 'regla-suelto') R.recargoSuelto = num(t.value);
     else if (t.id === 'regla-al-sol') R.redondeoAlSolDesde = num(t.value);
     else if (t.id === 'regla-en-8') R.terminaEn8Desde = num(t.value) || 1e9;
