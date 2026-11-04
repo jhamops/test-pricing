@@ -36,3 +36,15 @@ cuánto te queda después del IGV y la **clave del cuaderno** (`mes costo año %
    `CNAME precios → cname.vercel-dns.com`.
 
 Probar en local: `python3 -m http.server` y abrir http://localhost:8000.
+
+## Varios a la vez: foto, PDF o lista
+
+- **PDF de la factura con texto** (la electrónica del proveedor): se lee con pdf.js, al instante y exacto.
+- **Foto o PDF escaneado**: Tesseract (OCR) en el mismo navegador. Antes se endereza la hoja, se pasa a
+  blanco y negro y se borran las rayas de la tabla. El importe (cantidad × precio) corrige el punto
+  decimal perdido y la cantidad mal leída.
+- **Google Lens / Texto en vivo**: «Copiar texto» y «Pegar lo copiado». Si Lens copia la tabla por
+  columnas, se vuelven a armar las filas.
+- Se saltan encabezado, totales y pie (RUC, fecha, IGV…). Nada sale del equipo.
+- Librerías en `vendor/` (tesseract.js 7, modelo español `best_int`, pdf.js 4.10 legacy; Apache-2.0).
+  Se descargan la primera vez que se usan (~6 MB) y el navegador las guarda.

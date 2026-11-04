@@ -375,7 +375,7 @@ const leido = () => {
     return { sinPrecio, productos: productos.map((x, i) => ({ ...x, i, docena: docenaPegada.has(`${i}|${x.nombre}`) ? docenaPegada.get(`${i}|${x.nombre}`) : x.docena, pct: pctPegar })) };
 };
 $('abrir-pegar').addEventListener('click', () => {
-    $('pegado').value = ''; docenaPegada.clear(); pctPegar = pctNuevo;
+    $('pegado').value = ''; docenaPegada.clear(); pctPegar = pctNuevo; estadoArchivo('');
     $('pegar-pct').innerHTML = htmlPorcentajes(pctPegar);
     vistaPegado(); dPegar.showModal(); $('pegado').focus();
 });
@@ -392,13 +392,59 @@ function vistaPegado() {
             <button type="button" class="interr chico" data-pg-docena="${x.i}|${esc(x.nombre)}" aria-pressed="${x.docena}" aria-label="Por docena">x12</button>
             <span class="pg-precio">${precio}</span></li>`;
     }).join('');
+    const { saltadas } = leerLista($('pegado').value);
+    const saltos = saltadas.length ? `<p class="pg-saltadas">Salté ${saltadas.length} ${saltadas.length === 1 ? 'línea' : 'líneas'} que no son productos (RUC, fecha, totales…).</p>` : '';
     const malas = sinPrecio.length
         ? `<p class="pg-malas"><b>Sin precio, no ${sinPrecio.length === 1 ? 'entra' : 'entran'}:</b> ${sinPrecio.slice(0, 4).map((t) => `«${esc(t)}»`).join(', ')}${sinPrecio.length > 4 ? ` y ${sinPrecio.length - 4} más` : ''}</p>` : '';
-    $('vista-pegado').innerHTML = (filas ? `<ul class="pg-lista">${filas}</ul>` : '') + malas;
+    $('vista-pegado').innerHTML = (filas ? `<ul class="pg-lista">${filas}</ul>` : '') + malas + saltos;
     $('pegar-agregar').disabled = !productos.length;
     $('pegar-agregar').textContent = productos.length ? `Agregar ${productos.length}` : 'Agregar';
 }
 $('pegado').addEventListener('input', vistaPegado);
+// Lo que se trae (archivo o portapapeles) se suma al final del texto: ella lo ve y lo corrige.
+function sumarTexto(texto) {
+    const t = $('pegado');
+    t.value = (t.value.trim() ? `${t.value.trimEnd()}\n` : '') + String(texto || '').trim();
+    vistaPegado();
+}
+const estadoArchivo = (texto, error = false) => {
+    const e = $('estado-archivo');
+    e.hidden = !texto; e.textContent = texto || ''; e.classList.toggle('error', error);
+};
+$('pegar-portapapeles').addEventListener('click', async () => {
+    try {
+        const t = await navigator.clipboard.readText();
+        if (!t.trim()) { estadoArchivo('No hay nada copiado.', true); return; }
+        estadoArchivo(''); sumarTexto(t);
+    } catch {
+        estadoArchivo('El navegador no dejó leer lo copiado: mantén el dedo en el cuadro de abajo y elige «Pegar».', true);
+        $('pegado').focus();
+    }
+});
+$('archivo').addEventListener('change', async (e) => {
+    const archivo = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!archivo) return;
+    const botones = dPegar.querySelectorAll('.traer button, .traer input');
+    botones.forEach((b) => { b.disabled = true; });
+    dPegar.querySelector('.traer-archivo').classList.add('ocupado');
+    const inicio = performance.now();
+    try {
+        const { leerArchivo } = await import('./lector.js');
+        const { texto, como } = await leerArchivo(archivo, (t) => estadoArchivo(t));
+        const segundos = Math.max(1, Math.round((performance.now() - inicio) / 1000));
+        const antes = leerLista($('pegado').value).productos.length;
+        sumarTexto(texto);
+        const nuevos = leerLista($('pegado').value).productos.length - antes;
+        estadoArchivo(`${como === 'pdf' ? 'Leído del PDF' : 'Leído de la foto'} en ${segundos} s: ${nuevos} ${nuevos === 1 ? 'producto' : 'productos'}.${como === 'ocr' ? ' Revisa los precios: la foto puede confundir números.' : ''}`);
+    } catch (err) {
+        console.error(err);
+        estadoArchivo('No pude leer ese archivo. Prueba con otra foto (derecha y con luz) o con Google Lens.', true);
+    } finally {
+        botones.forEach((b) => { b.disabled = false; });
+        dPegar.querySelector('.traer-archivo').classList.remove('ocupado');
+    }
+});
 $('pegar-pct').addEventListener('click', (e) => {
     const b = e.target.closest('[data-pct]');
     if (!b) return;

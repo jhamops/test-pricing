@@ -66,7 +66,7 @@
             </form>
             <div id="vista-previa" class="vista-previa" aria-live="polite"></div>
             <div class="mas-formas">
-                <button type="button" class="enlace" id="abrir-pegar">Pegar varios</button>
+                <button type="button" class="enlace" id="abrir-pegar">Varios a la vez: foto, PDF o lista</button>
             </div>
         </section>
 
@@ -152,11 +152,17 @@
     <dialog id="dialogo-pegar" aria-labelledby="titulo-pegar">
         <form method="dialog" class="dialogo">
             <div class="dialogo-tope">
-                <h2 id="titulo-pegar">Pegar varios productos</h2>
+                <h2 id="titulo-pegar">Varios productos</h2>
                 <button class="boton-icono" value="cerrar" aria-label="Cerrar">✕</button>
             </div>
             <div class="dialogo-cuerpo">
-                <p class="ayuda chico">Una línea por producto. Escríbelo, díctalo con el micrófono del teclado, o pega de un WhatsApp, una factura o un Excel.</p>
+                <div class="traer">
+                    <label class="boton-principal chico traer-archivo">Foto o PDF de la factura<input type="file" id="archivo" accept="image/*,application/pdf"></label>
+                    <button type="button" class="boton-secundario" id="pegar-portapapeles">Pegar lo copiado</button>
+                </div>
+                <p class="estado-archivo" id="estado-archivo" aria-live="polite" hidden></p>
+                <p class="ayuda chico">¿La foto sale mal? Ábrela con <b>Google Lens</b>, toca «Copiar texto» y aquí «Pegar lo copiado».</p>
+                <p class="ayuda chico">O escríbelo, una línea por producto:</p>
                 <dl class="ejemplos">
                     <div><dt>Cono 30 cm 3.50</dt><dd>compra S/ 3.50</dd></div>
                     <div><dt>Pelota de vóley 18 x 6</dt><dd>6 unidades</dd></div>

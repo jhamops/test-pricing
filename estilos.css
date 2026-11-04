@@ -473,3 +473,13 @@ textarea {
 .pg-nombre small, .pg-precio small { color: var(--texto-2); font-size: .85rem; font-weight: 600; }
 .pg-precio { text-align: right; font-weight: 900; color: var(--marca); font-size: 1.05rem; }
 .pg-malas { margin: 8px 0 0; padding: 8px 10px; border-radius: 10px; color: var(--texto); background: color-mix(in srgb, #d97706 14%, var(--superficie)); border: 1px solid color-mix(in srgb, #d97706 35%, var(--superficie)); }
+.traer { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 8px; }
+.traer > * { flex: 1 1 200px; }
+.traer-archivo { position: relative; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; text-align: center; }
+.traer-archivo input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; }
+.traer-archivo:focus-within { outline: 3px solid color-mix(in srgb, var(--marca) 45%, transparent); outline-offset: 2px; }
+.traer-archivo.ocupado { opacity: .6; pointer-events: none; }
+.estado-archivo { margin: 0 0 8px; padding: 8px 10px; border-radius: 10px; font-weight: 700; background: var(--marca-suave); color: var(--texto); }
+.estado-archivo.error { background: color-mix(in srgb, #dc2626 12%, var(--superficie)); }
+.pg-saltadas { margin: 8px 0 0; color: var(--texto-3); font-size: .9rem; }
+.ayuda.chico + .ayuda.chico { margin-top: -4px; }

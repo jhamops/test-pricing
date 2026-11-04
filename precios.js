@@ -154,8 +154,8 @@ export function fletePorUnidad(fleteTotal, productos) {
  * - Columnas de Excel con títulos (Producto · Cantidad · Costo) se leen por su título.
  */
 const MEDIDA = String.raw`(?:cm|mm|mts?|m|metros?|cent[ií]metros?|kg|kilos?|gr?s?|gramos?|ml|lts?|l|litros?|oz|pulg(?:adas)?|w|v|mah|gb|p)\b`;
-const UNIDADES = String.raw`(?:und|unds|unid|unidades|uds?|u|pzas?|piezas?|pqtes?|paquetes?)\b\.?`;
-const NUMERO = /(?<![\w.,°/#-])(\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:[.,]\d+)?)(?![\w°%]|[.,]\d)/g;
+const UNIDADES = String.raw`(?:und|unds|unid|unidades|uds?|u|niu|nius|pzas?|piezas?|pqtes?|paquetes?)\b\.?`;
+const NUMERO = /(?<![\w.,°/#:-])(\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:[.,]\d+)?)(?![\w°%/:-]|[.,]\d)/g;
 const aNumero = (t) => Number(/^\d{1,3}(,\d{3})+(\.\d+)?$/.test(t) ? t.replace(/,/g, '') : t.replace(',', '.'));
 const casi = (a, b) => Math.abs(a - b) <= Math.max(0.05, b * 0.01);
 
@@ -171,6 +171,8 @@ function leerLinea(cruda) {
         .replace(/(\d+)\s*c[eé]ntimos?\b/gi, (_, c) => `0.${c.padStart(2, '0')}`)
         .replace(/\bS\s*\/\s*\.?/gi, '  ').replace(/\bc\s*\/\s*u\b\.?/gi, '   ').replace(/\bPEN\b/g, '   ');
 
+    // Lo que deja la cuadrícula de una tabla leída de una foto: rayas, barras, comillas.
+    l = l.replace(/[_—“”"`|¦!]+/g, (t) => ' '.repeat(t.length));
     let cantidad = null, docena = false, flete = '', docenaEsPrecio = false, m;
     // flete 5
     if ((m = l.match(/\bflete\s*:?\s*(\d+(?:[.,]\d+)?)/i))) { flete = String(aNumero(m[1])); l = quitar(l, m); }
@@ -191,16 +193,41 @@ function leerLinea(cruda) {
     let costo = null;
     const usar = (n) => { l = quitar(l, n.x); };
     const ultimo = nums[nums.length - 1];
-    // Factura: … cantidad precio total
-    if (nums.length >= 2 && cantidad && casi(cantidad * nums[nums.length - 2].v, ultimo.v)) {
-        costo = nums[nums.length - 2].v; usar(nums[nums.length - 2]); usar(ultimo);
-    } else if (nums.length >= 3 && !cantidad) {
-        const [a, b] = [nums[nums.length - 3], nums[nums.length - 2]];
-        if (casi(a.v * b.v, ultimo.v) && (Number.isInteger(a.v) || Number.isInteger(b.v))) {
-            const [q, p] = Number.isInteger(a.v) && (!Number.isInteger(b.v) || a.x.index < b.x.index) ? [a, b] : [b, a];
-            cantidad = q.v; costo = p.v; usar(a); usar(b); usar(ultimo);
+    // Factura: … cantidad · precio · importe. El importe es el control: con él se recupera un
+    // punto decimal que la foto se comió («350» → 3.50) y una cantidad mal leída o perdida.
+    const alt = (n) => [n.v, ...(/^\d{3,}$/.test(n.x[1]) ? [n.v / 100] : [])];
+    const altImporte = (n) => alt(n).reverse();
+    const tieneDecimal = (n) => /[.,]\d{2}$/.test(n.x[1]) || /^\d{3,}$/.test(n.x[1]);
+    const penultimo = nums[nums.length - 2];
+    const intentar = () => {
+        if (nums.length >= 2 && cantidad) {
+            for (const pv of alt(penultimo)) for (const tv of alt(ultimo)) {
+                if (casi(cantidad * pv, tv)) { costo = pv; usar(penultimo); usar(ultimo); return; }
+            }
         }
-    }
+        if (nums.length >= 3 && !cantidad) {
+            const a = nums[nums.length - 3], b = penultimo;
+            for (const av of alt(a)) for (const bv of alt(b)) for (const tv of alt(ultimo)) {
+                if (!casi(av * bv, tv)) continue;
+                if (Number.isInteger(a.v) && av === a.v && a.x[1].length <= 4) { cantidad = av; costo = bv; usar(a); usar(b); usar(ultimo); return; }
+                if (Number.isInteger(b.v) && bv === b.v && b.x[1].length <= 4) { cantidad = bv; costo = av; usar(a); usar(b); usar(ultimo); return; }
+            }
+        }
+        // Solo precio e importe con decimales, y el importe es un múltiplo exacto: la cantidad sale de la cuenta.
+        if (nums.length >= 2 && !cantidad && tieneDecimal(penultimo) && tieneDecimal(ultimo)) {
+            for (const pv of alt(penultimo)) for (const tv of altImporte(ultimo)) {
+                const q = Math.round(tv / pv);
+                if (pv > 0 && q >= 2 && q <= 100000 && casi(q * pv, tv)) {
+                    cantidad = q; costo = pv; usar(penultimo); usar(ultimo);
+                    // Un entero al principio era la cantidad mal leída: fuera.
+                    const primero = nums[0];
+                    if (primero !== penultimo && Number.isInteger(primero.v) && !l.slice(0, primero.x.index).trim()) usar(primero);
+                    return;
+                }
+            }
+        }
+    };
+    intentar();
     if (costo == null) {
         costo = ultimo.v; usar(ultimo);
         // «24 Cono 30 cm 3.50»: el número del principio es la cantidad
@@ -208,9 +235,13 @@ function leerLinea(cruda) {
         if (!cantidad && nums.length >= 2 && Number.isInteger(primero.v) && !l.slice(0, primero.x.index).trim()) { cantidad = primero.v; usar(primero); }
     }
     if (docenaEsPrecio) costo = Math.round((costo / 12) * 10000) / 10000;
-    const nombre = l.replace(/\s+/g, ' ').trim()
+    const nombre = l.replace(/\s*[|¦]\s*/g, ' ').replace(/\s+/g, ' ').trim()
         .replace(/^[-–:·|,;*•.\s]+|[-–:·|,;=*•\s]+$/g, '')
-        .replace(/\s+(?:a|de|en|al|x|por)$/i, '').replace(/^(?:a|de)\s+/i, '').trim();
+        .replace(/\s+(?:a|de|en|al|x|por)$/i, '').replace(/^(?:a|de)\s+/i, '')
+        .replace(/^(?:[a-z]\s+)?(?:\S{0,3}n[iíl1]?u|nius|zz|und|unid|kgm|mtr|lbr|pqt|paq|cja|caj|bol|bls|pk|bx)\b\.?\s*/i, '')
+        .replace(/^[^\p{L}\d]*\p{L}\s+(?=\p{L}{2})/u, '').trim();
+    // Un «nombre» sin letras (basura de la foto) no es un producto.
+    if (nombre && !/\p{L}{2}/u.test(nombre)) return null;
     if (!(costo > 0)) return null;
     return { nombre, costo, cantidad: cantidad > 0 ? cantidad : null, docena, flete };
 }
@@ -229,11 +260,90 @@ function columnasDeTitulos(linea) {
     return col.costo >= 0 && col.nombre >= 0 ? col : null;
 }
 
-/** → { productos: [{ nombre, costo, cantidad, docena, flete }], sinPrecio: [líneas que no se entendieron] } */
+/**
+ * Lo que de una factura NO es producto: encabezado, totales, pie. Al leer una foto o un
+ * PDF entero salen; se saltan (y se cuentan) en vez de volverse «productos».
+ */
+const NO_ES_PRODUCTO = /\b(?:r\.?\s*u\.?\s*c|dni|factura|boleta|electr[oó]nica|fecha|emisi[oó]n|vencimiento|sub\s*-?\s*total|total|igv|i\.g\.v|op\.?\s*(?:gravada|exonerada|inafecta)|gravad[ao]|exonerad[ao]|inafect[ao]|descuentos?|importe\s+total|son\s*:|soles\s+con|tel[eé]?f|tel[eé]fono|celular|cel\.|direcci[oó]n|domicilio|av\.|jr\.|calle|cliente|se[ñn]or(?:es)?|raz[oó]n\s+social|vendedor|gu[ií]a|moneda|forma\s+de\s+pago|condici[oó]n|cr[eé]dito|contado|cuotas?|p[aá]gina|www\.|https?|hash|resumen|representaci[oó]n|autorizad[oa]|consulte|serie|n[°º]\s*de\s*orden|orden\s+de\s+compra|cuenta|banco|bcp|interbank|bbva|yape|plin|detracci[oó]n|retenci[oó]n|percepci[oó]n|vuelto|efectivo|cambio|s\.?\s*a\.?\s*c\.?|e\.?\s*i\.?\s*r\.?\s*l\.?|s\.?\s*r\.?\s*l\.?|s\.?\s*a\.?\s*a\.?)(?=\W|$)|\b[FBE][A-Z0-9]{3}\s*-\s*\d{1,8}\b|@/i;
+
+/** ¿La línea es solo números (una celda de una columna copiada sola)? */
+const soloNumero = (t) => /^\s*(?:S\s*\/\s*\.?\s*)?\d{1,3}(?:,\d{3})*(?:[.,]\d+)?\s*(?:und|unid|u|uds?|pzas?|nius|niu|doc|dz)?\.?\s*$/i.test(t) || /^\s*\d+(?:[.,]\d+)?\s*$/.test(t);
+const TITULO_COLUMNA = /^\s*(?:cant(?:idad)?\.?|c[oó]d(?:igo)?\.?|u\.?\s*m\.?|unidad(?:\s+de\s+medida)?|descripci[oó]n|producto|art[ií]culo|detalle|[ií]tem|p\.?\s*unit(?:ario)?\.?|precio(?:\s+unit(?:ario)?\.?)?|v\.?\s*unit(?:ario)?\.?|valor(?:\s+unit(?:ario)?\.?)?|importe|sub\s*total|total|n[°º]|#)\s*$/i;
+
+const PALABRA_TITULO = /^(?:cant(?:idad)?\.?|c[oó]d(?:igo)?\.?|u\.?m\.?|um|unidad|medida|de|descripci[oó]n|producto|art[ií]culo|detalle|[ií]tem|p\.?\s*unit(?:ario)?\.?|p\.|unit\.?|unitario|precio|v\.?\s*unit\.?|valor|venta|importe|sub\s*total|total|n[°º]|#|und\.?)$/i;
+const esTitulos = (t) => { const w = t.split(/[\s|¦]+/).filter(Boolean); return w.length >= 2 && w.every((x) => PALABRA_TITULO.test(x)); };
+
+/**
+ * Google Lens y «Texto en vivo» copian a veces una tabla POR COLUMNAS: primero todas las
+ * descripciones, después todas las cantidades, después todos los precios. Si hay un bloque
+ * de K nombres sin precio pegado a bloques de números que son múltiplo de K, se vuelven a
+ * armar las filas («Cono 30 cm» + 24 + 3.50 + 84.00 → «24 Cono 30 cm 3.50 84.00»).
+ */
+function rearmarColumnas(lineas) {
+    const limpias = lineas; // los títulos de columna ya se saltaron
+    const bloques = [];
+    for (const t of limpias) {
+        const tipo = soloNumero(t) ? 'num' : 'txt';
+        if (bloques.length && bloques.at(-1).tipo === tipo) bloques.at(-1).items.push(t.trim());
+        else bloques.push({ tipo, items: [t.trim()] });
+    }
+    const valor = (t) => aNumero(t.replace(/[^\d.,]/g, ''));
+    // ¿Cuántas filas (K) tienen esos N números? La que mejor parece tabla:
+    // tres columnas con cantidad × precio = importe, o una de enteros (la cantidad), o una sola.
+    function mejorK(items, maxK) {
+        const N = items.length;
+        let mejor = null;
+        for (let K = Math.min(N, maxK); K >= 2; K--) {
+            if (N % K) continue;
+            const c = N / K;
+            if (c > 4) continue;
+            const cols = (items) => Array.from({ length: c }, (_, j) => items.slice(j * K, (j + 1) * K).map(valor));
+            const puntaje = () => {
+                const cs = cols(items);
+                if (c === 1) return 1;
+                for (let x = 0; x < c; x++) for (let y = 0; y < c; y++) for (let z = 0; z < c; z++) {
+                    if (x === y || y === z || x === z) continue;
+                    if (cs[x].every((v, f) => Number.isInteger(v) && casi(v * cs[y][f], cs[z][f]))) return 3;
+                }
+                return cs.some((col) => col.every(Number.isInteger)) && c === 2 ? 2 : 0;
+            };
+            const p = puntaje();
+            if (p > 0 && (!mejor || p > mejor.p)) mejor = { K, p };
+        }
+        return mejor && mejor.K;
+    }
+    const salida = [];
+    for (let i = 0; i < bloques.length; i++) {
+        const b = bloques[i];
+        if (b.tipo !== 'txt') { salida.push(...b.items); continue; }
+        const sig = bloques[i + 1];
+        // Los nombres candidatos: los del final del bloque que no traen precio propio.
+        let sinPrecio = 0;
+        for (let f = b.items.length - 1; f >= 0 && !leerLinea(b.items[f]); f--) sinPrecio++;
+        if (!sig || sig.tipo !== 'num' || sinPrecio < 2) { salida.push(...b.items); continue; }
+        const K = mejorK(sig.items, sinPrecio);
+        if (!K) { salida.push(...b.items); continue; }
+        const c = sig.items.length / K;
+        const nombres = b.items.slice(-K);
+        salida.push(...b.items.slice(0, -K));
+        for (let f = 0; f < K; f++) salida.push([nombres[f], ...Array.from({ length: c }, (_, j) => sig.items[j * K + f])].join(' '));
+        i++; // el bloque de números ya se usó
+    }
+    return salida;
+}
+
+/**
+ * → { productos: [{ nombre, costo, cantidad, docena, flete }], sinPrecio: [líneas sin precio],
+ *     saltadas: [encabezado y totales de una factura] }
+ */
 export function leerLista(texto) {
-    const productos = [], sinPrecio = [];
-    const lineas = String(texto || '').split(/\r?\n/).filter((x) => x.trim());
+    const productos = [], sinPrecio = [], saltadas = [];
+    let lineas = String(texto || '').split(/\r?\n/).filter((x) => x.trim());
     const col = lineas.length && lineas[0].includes('\t') ? columnasDeTitulos(lineas[0]) : null;
+    if (!col) {
+        lineas = lineas.filter((t) => (NO_ES_PRODUCTO.test(t) || TITULO_COLUMNA.test(t) || esTitulos(t) ? (saltadas.push(t.trim()), false) : true));
+        lineas = rearmarColumnas(lineas);
+    }
     for (const linea of col ? lineas.slice(1) : lineas) {
         let p = null;
         if (col) {
@@ -241,11 +351,14 @@ export function leerLista(texto) {
             const n = (i) => (i >= 0 && c[i] != null ? aNumero(String(c[i]).replace(/S\s*\/\s*\.?|\s/gi, '')) : NaN);
             const costo = n(col.costo);
             if (costo > 0) p = { nombre: String(c[col.nombre] || '').trim(), costo, cantidad: n(col.cantidad) > 0 ? n(col.cantidad) : null, docena: false, flete: n(col.flete) > 0 ? String(n(col.flete)) : '' };
-        } else p = leerLinea(linea);
+        } else p = (linea.match(/\p{L}/gu) || []).length >= 2 ? leerLinea(linea) : null; // sin nombre: basura de la foto
+        // Un «producto» de 9+ cifras es un RUC, un teléfono o un código, no un precio.
+        if (p && p.costo >= 1e6) p = null;
         if (p) productos.push({ ...p, nombre: p.nombre || `Producto ${productos.length + 1}` });
+        else if (TITULO_COLUMNA.test(linea) || esTitulos(linea) || (linea.match(/\p{L}/gu) || []).length < 4) saltadas.push(linea.trim());
         else sinPrecio.push(linea.trim());
     }
-    return { productos, sinPrecio };
+    return { productos, sinPrecio, saltadas };
 }
 
 export const leerPegado = (texto) => leerLista(texto).productos;

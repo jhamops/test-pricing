@@ -127,7 +127,31 @@ test('pegar: factura, Excel, dictado, flete y lo que no se entiende', () => {
     assert.equal(leerPegado('Guitarra 1,200.00')[0].costo, 1200);
     const excel = leerLista('Producto\tCantidad\tCosto\nCono 30 cm\t24\t3.50\nAro\t36\tS/ 1.20\nTotal\t\t');
     assert.deepEqual(excel.productos.map((p) => [p.nombre, p.cantidad, p.costo]), [['Cono 30 cm', 24, 3.5], ['Aro', 36, 1.2]]);
-    assert.deepEqual(excel.sinPrecio, ['Total']); // se avisa, no se pierde callado
+    assert.deepEqual(excel.saltadas, ['Total']);
+    assert.deepEqual(leerLista('Cono 3.50\nnada que ver').sinPrecio, ['nada que ver']); // se avisa, no se pierde callado
+});
+
+test('pegar: Google Lens copia la tabla por columnas y se vuelven a armar las filas', () => {
+    const lens = ['DISTRIBUIDORA DEPORTES SAC', 'RUC 20601234567', 'FACTURA ELECTRÓNICA', 'F001-000123',
+        'Cant.', 'Descripción', 'P. Unit.', 'Importe',
+        'Cono 30 cm naranja', 'Aro plástico 60 cm', 'Pelota de vóley N°5', 'Silbato metálico',
+        '24', '36', '6', '12', '3.50', '1.20', '18.00', '2.40', '84.00', '43.20', '108.00', '28.80',
+        'OP. GRAVADA 223.73', 'IGV 18% 40.27', 'TOTAL S/ 264.00'].join('\n');
+    const { productos, sinPrecio } = leerLista(lens);
+    assert.deepEqual(productos.map((p) => [p.nombre, p.cantidad, p.costo]), [
+        ['Cono 30 cm naranja', 24, 3.5], ['Aro plástico 60 cm', 36, 1.2], ['Pelota de vóley N°5', 6, 18], ['Silbato metálico', 12, 2.4],
+    ]);
+    assert.deepEqual(sinPrecio, []);
+    // Solo nombres y una columna de precios, sin cantidades.
+    assert.deepEqual(leerPegado('Cono\nAro\nPelota\n3.50\n1.20\n18').map((p) => [p.nombre, p.costo]), [['Cono', 3.5], ['Aro', 1.2], ['Pelota', 18]]);
+});
+
+test('pegar: de una factura entera se saltan encabezado, totales y pie', () => {
+    const { productos, sinPrecio, saltadas } = leerLista(['RUC: 20601234567', 'Fecha de emisión: 12/03/2026', 'CANT UM DESCRIPCIÓN P.UNIT IMPORTE',
+        '24 NIU CONO 30 CM NARANJA 3.50 84.00', '36 NIU | ARO PLASTICO 60 CM | 1.20 | 43.20', 'TOTAL 127.20', 'Telf: 064 123456'].join('\n'));
+    assert.deepEqual(productos.map((p) => [p.nombre, p.cantidad, p.costo]), [['CONO 30 CM NARANJA', 24, 3.5], ['ARO PLASTICO 60 CM', 36, 1.2]]);
+    assert.deepEqual(sinPrecio, []);
+    assert.equal(saltadas.length, 5);
 });
 
 test('texto para copiar', () => {
@@ -200,3 +224,22 @@ test('por docena solo si ella lo marca en ese producto', () => {
     assert.equal(calcular({ costo: 40, pct: 50, docena: true }, R).porDocena, true); // también lo caro, si lo vende por mayor
     assert.equal(calcular({ costo: 40, pct: 50, docena: true }, R).docena, Math.round(calcular({ costo: 40, pct: 50, docena: true }, R).docenaUnidad * 12 * 100) / 100);
 });
+
+test('pegar: lo leído de una foto se corrige con el importe (punto perdido, cantidad mal leída, basura)', () => {
+    const ocr = [
+        '_      24 NIU       CONO DE ENTRENAMIENTO 30 CM NARANJA      —_     350          84.00', // 3.50 sin punto
+        '—    6 | NIU  — PELOTA DE VOLEY MIKASA N*5          —_    45.00   27000', // importe sin punto
+        '|           38 Inu | ARO PLASTICO 60 CM        1.20               43.20', // 36 leído como 38
+        'AlniU | MANCUERNA HEXAGONAL 5 KG          38.90 |             155.60', // la cantidad se perdió
+        '"1', 'U', // restos de la cuadrícula
+    ].join('\n');
+    const { productos, sinPrecio } = leerLista(ocr);
+    assert.deepEqual(productos.map((p) => [p.nombre, p.cantidad, p.costo]), [
+        ['CONO DE ENTRENAMIENTO 30 CM NARANJA', 24, 3.5],
+        ['PELOTA DE VOLEY MIKASA N*5', 6, 45],
+        ['ARO PLASTICO 60 CM', 36, 1.2],
+        ['MANCUERNA HEXAGONAL 5 KG', 4, 38.9],
+    ]);
+    assert.deepEqual(sinPrecio, []);
+});
+
