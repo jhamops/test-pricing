@@ -36,6 +36,11 @@ try {
     }
 } catch { /* sin guardado: se empieza de cero */ }
 const guardar = () => { try { localStorage.setItem(GUARDADO, JSON.stringify(estado)); } catch { /* modo privado */ } };
+// La escalera de antes (sin ajustar a sus precios): si nadie la tocó, pasa a la nueva.
+if (estado.regla.escalera.map((e) => e.pct).join() === '57,42,47,37,27') {
+    estado.regla.escalera = copia(REGLA_INICIAL.escalera);
+    guardar();
+}
 let siguienteId = estado.productos.reduce((m, p) => Math.max(m, p.id), 0) + 1;
 
 // ── Tema ───────────────────────────────────────────────────────────────────

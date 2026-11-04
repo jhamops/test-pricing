@@ -18,11 +18,12 @@ export const REGLA_INICIAL = {
     // Si costó menos que `hasta`, le sumas `pct` % de GANANCIA. El último no tiene tope.
     // (La comisión de tarjeta va aparte y siempre: ver `tarjeta`.)
     escalera: [
-        { hasta: 5, pct: 57 },
-        { hasta: 20, pct: 42 },
-        { hasta: 60, pct: 47 },
-        { hasta: 150, pct: 37 },
-        { hasta: null, pct: 27 },
+        // Ajustados con sus 38 precios reales (`precios-reales.js`): error medio 4.8 %.
+        { hasta: 5, pct: 58 },
+        { hasta: 20, pct: 38 },
+        { hasta: 60, pct: 52 },
+        { hasta: 150, pct: 38 },
+        { hasta: null, pct: 31 },
     ],
     porDocenaOn: true, // ¿se saca precio por docena? (opcional)
     docenaHasta: 18, // lo que cuesta menos que esto se vende por docena y suelto

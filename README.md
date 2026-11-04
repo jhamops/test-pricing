@@ -20,7 +20,8 @@ cuánto te queda después del IGV y la **clave del cuaderno** (`mes costo año %
 |---|---|
 | `index.html`, `estilos.css`, `app.js` | la página |
 | `precios.js` | la cuenta (sin pantalla) |
-| `precios.test.mjs` | pruebas: `node --test` (contra los precios reales del cuaderno) |
+| `precios-reales.js` | sus 38 precios reales (costo → precio), sin nombres |
+| `precios.test.mjs` | pruebas: `node --test` (la escalera se mide contra esos 38: error medio ≤ 5 %) |
 | `marca/` | escudo e íconos de ILLAK |
 
 ## Publicar en Vercel
