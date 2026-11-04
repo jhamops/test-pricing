@@ -15,13 +15,14 @@
  */
 
 export const REGLA_INICIAL = {
-    // Si costó menos que `hasta`, le sumas `pct` %. El último no tiene tope.
+    // Si costó menos que `hasta`, le sumas `pct` % de GANANCIA. El último no tiene tope.
+    // (La comisión de tarjeta va aparte y siempre: ver `tarjeta`.)
     escalera: [
-        { hasta: 5, pct: 60 },
-        { hasta: 20, pct: 45 },
-        { hasta: 60, pct: 50 },
-        { hasta: 150, pct: 40 },
-        { hasta: null, pct: 30 },
+        { hasta: 5, pct: 57 },
+        { hasta: 20, pct: 42 },
+        { hasta: 60, pct: 47 },
+        { hasta: 150, pct: 37 },
+        { hasta: null, pct: 27 },
     ],
     docenaHasta: 18, // lo que cuesta menos que esto se vende por docena y suelto
     recargoSuelto: 15, // el suelto, este % más que la unidad por docena
@@ -29,8 +30,10 @@ export const REGLA_INICIAL = {
     terminaEn8Desde: 100, // desde este precio termina en 8
     ajustes: { competencia: -10, rentable: 15 }, // puntos que se restan o suman al %
     conFactura: true, // compra con factura y paga IGV: la ganancia se mide sin IGV
-    tarjeta: 3, // % del POS, solo para «si te paga con tarjeta»
-    tarjetaOn: true,
+    // La comisión del POS (Culqi) va SIEMPRE dentro del precio, pague como pague: el
+    // precio se divide entre (1 − 3 %), así lo que queda después de la comisión es exacto.
+    tarjeta: 3,
+    tarjetaSiempre: true,
 };
 
 const r2 = (n) => Math.round(n * 100) / 100;
@@ -74,7 +77,10 @@ export function calcular({ costo, flete = 0, ajuste = 'normal' }, regla) {
     const f = Number(flete) || 0;
     const base = r2(c + f);
     const pct = porcentajeDe(c, regla, ajuste);
-    const conPct = base * (1 + pct / 100);
+    const comisionPct = (Number(regla.tarjeta) || 0) / 100;
+    const t = regla.tarjetaSiempre === false ? 0 : comisionPct;
+    // Costo + ganancia, y encima lo que se lleva la tarjeta (dividiendo, no sumando).
+    const conPct = (base * (1 + pct / 100)) / (1 - t);
     const porDocena = c < regla.docenaHasta;
     let docenaUnidad = null, suelto;
     if (porDocena) {
@@ -85,15 +91,27 @@ export function calcular({ costo, flete = 0, ajuste = 'normal' }, regla) {
         suelto = redondearPrecio(conPct, regla);
     }
     const venta = porDocena ? docenaUnidad : suelto;
-    const ganas = r2(venta - base);
-    const teQueda = regla.conFactura ? r2((venta - c) / 1.18 - f) : ganas;
+    const comision = r2(venta * t);
+    const ganas = r2(venta - base - comision);
+    // Con factura y pagando IGV, de lo cobrado una parte es IGV que va a SUNAT: se mide sin él.
+    const teQueda = regla.conFactura ? r2((venta - c) / 1.18 - f - comision) : ganas;
     return {
-        porcentaje: pct, costoConFlete: base, porDocena, sinRedondear: r2(conPct),
+        porcentaje: pct, costoConFlete: base, porDocena, sinRedondear: r2(conPct), comision,
         docenaUnidad, docena: porDocena ? r2(docenaUnidad * 12) : null,
-        suelto, ganas, ganasSuelto: r2(suelto - base), teQueda,
-        conTarjeta: r2(teQueda - venta * ((regla.tarjetaOn === false ? 0 : regla.tarjeta) / 100)),
+        suelto, ganas, ganasSuelto: r2(suelto - base - r2(suelto * t)), teQueda,
+        // Si le pagan en efectivo o Yape, la comisión no se cobra: le queda eso de más.
+        enEfectivo: r2(teQueda + comision),
+        // Si la comisión NO va en el precio: lo que queda cuando sí pagan con tarjeta.
+        conTarjeta: r2(teQueda - venta * (t ? 0 : comisionPct)),
     };
 }
+
+/** Flete por unidad de UN producto: el flete que pagaste por él entre las unidades (o todo, si no dices cuántas). */
+export const fleteDelProducto = (fleteTotal, cantidad) => {
+    const total = Number(fleteTotal) || 0;
+    if (total <= 0) return 0;
+    return total / (Number(cantidad) > 0 ? Number(cantidad) : 1);
+};
 
 /** La clave del cuaderno: «03 10 26 50». */
 export function clave(costo, porcentaje, fecha = new Date()) {

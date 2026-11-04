@@ -34,7 +34,7 @@
                 <span class="icono" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M8 6h8M8 10h.01M12 10h.01M16 10h.01M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h4"/></svg></span>
                 <div>
                     <h1 id="titulo-entrada">¿Cuánto te costó?</h1>
-                    <p class="ayuda">Escribe el costo y te digo a cuánto venderlo. <b>Enter</b> y sigues con el siguiente.</p>
+                    <p class="ayuda">Escribe el costo y te digo a cuánto venderlo. <b>Enter</b> y sigues con el siguiente. El flete y la tarjeta ya van incluidos.</p>
                 </div>
             </div>
             <form id="form-nuevo" autocomplete="off">
@@ -46,6 +46,9 @@
                 </label>
                 <label class="campo campo-cant">Cantidad
                     <input id="nuevo-cant" inputmode="numeric" placeholder="opcional" enterkeyhint="done">
+                </label>
+                <label class="campo campo-flete">Flete
+                    <span class="con-sol"><span aria-hidden="true">S/</span><input id="nuevo-flete" inputmode="decimal" placeholder="opcional" enterkeyhint="done" aria-label="Flete que pagaste por este producto (todo)"></span>
                 </label>
                 <button type="submit" class="boton-principal" id="agregar">+ Agregar</button>
             </form>
@@ -127,7 +130,8 @@
 
                 <h3><span class="paso">5</span> Cómo compras y cobras</h3>
                 <label class="interruptor"><input type="checkbox" id="regla-factura"> Compro con factura y pago IGV <small>(«te queda» descuenta el IGV)</small></label>
-                <label class="interruptor"><input type="checkbox" id="regla-tarjeta-on"> A veces me pagan con tarjeta: <span class="con-sol mini"><input id="regla-tarjeta" inputmode="decimal" aria-label="Porcentaje del POS"><span aria-hidden="true">%</span></span></label>
+                <label class="interruptor"><input type="checkbox" id="regla-tarjeta-siempre"> La comisión de tarjeta va <b>siempre</b> en el precio: <span class="con-sol mini"><input id="regla-tarjeta" inputmode="decimal" aria-label="Porcentaje del POS"><span aria-hidden="true">%</span></span></label>
+                <p class="ejemplo">Se pague con lo que se pague: el precio se divide entre (1 − ese %): con 3 %, entre 0.97 (no se suma 3 %). Así, después de la comisión te queda exacto lo que querías ganar.</p>
             </div>
             <div class="dialogo-pie">
                 <button type="button" class="boton-texto" id="regla-reiniciar">Volver a la regla de siempre</button>

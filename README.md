@@ -9,7 +9,8 @@ cuánto te queda después del IGV y la **clave del cuaderno** (`mes costo año %
   3. redondeo según el precio: 10 céntimos, al sol, y lo caro **termina en 8** (98 y no 100: ya trae su rebaja);
   4. por producto, con un toque: normal, mucha competencia (menos %) o rentable (más %).
 - Uno por uno (Enter y sigues) o **varios pegados** de una factura, lista o WhatsApp.
-- **Flete** de la compra repartido entre las unidades.
+- **Flete**: el de un producto (entre sus unidades) o el de toda la compra (repartido).
+- **La comisión de tarjeta (3 %) va siempre dentro del precio**, pague como pague: se divide entre 0.97.
 - La regla se cambia en ⚙ con ejemplos que se actualizan solos, y se guarda solo en el equipo
   (si borras los datos del navegador, se pierde). Sin servidor ni base de datos.
 

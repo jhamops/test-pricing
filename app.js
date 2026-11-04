@@ -2,9 +2,9 @@
  * La pantalla. La cuenta vive en `precios.js` (con sus pruebas); aquí solo se escribe,
  * se muestra y se guarda en este equipo (localStorage).
  */
-import { REGLA_INICIAL, calcular, clave, escalonDe, fletePorUnidad, leerPegado, redondearPrecio, textoParaCopiar } from './precios.js';
+import { REGLA_INICIAL, calcular, clave, escalonDe, fleteDelProducto, fletePorUnidad, leerPegado, redondearPrecio, textoParaCopiar } from './precios.js';
 
-const GUARDADO = 'illak-calculadora-v2';
+const GUARDADO = 'illak-calculadora-v3';
 const $ = (id) => document.getElementById(id);
 const soles = (n) => `S/ ${Number(n).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const num = (t) => {
@@ -26,11 +26,12 @@ try {
     if (g && Array.isArray(g.productos)) {
         estado = { ...estado, ...g, regla: { ...copia(REGLA_INICIAL), ...(g.regla || {}), ajustes: { ...REGLA_INICIAL.ajustes, ...(g.regla?.ajustes || {}) } } };
     } else {
-        // La versión anterior tenía familias por producto: se rescata solo la lista.
-        const v1 = JSON.parse(localStorage.getItem('illak-calculadora-v1') || 'null');
-        if (v1 && Array.isArray(v1.productos)) {
-            estado.productos = v1.productos.map((p) => ({ id: p.id, nombre: p.nombre, costo: p.costo, cantidad: p.cantidad, ajuste: 'normal' }));
-            estado.flete = v1.flete || '';
+        // Versiones anteriores (otra regla): se rescata solo la lista; la regla nueva ya
+        // trae la comisión de tarjeta adentro.
+        const viejo = JSON.parse(localStorage.getItem('illak-calculadora-v2') || localStorage.getItem('illak-calculadora-v1') || 'null');
+        if (viejo && Array.isArray(viejo.productos)) {
+            estado.productos = viejo.productos.map((p) => ({ id: p.id, nombre: p.nombre, costo: p.costo, cantidad: p.cantidad, ajuste: p.ajuste || 'normal', flete: '' }));
+            estado.flete = viejo.flete || '';
         }
     }
 } catch { /* sin guardado: se empieza de cero */ }
@@ -49,7 +50,10 @@ $('tema').addEventListener('click', () => {
 
 // ── La cuenta ──────────────────────────────────────────────────────────────
 const fleteUnidad = () => fletePorUnidad(num(estado.flete), estado.productos);
-const resultado = (p) => calcular({ costo: p.costo, ajuste: p.ajuste, flete: Number(p.cantidad) > 0 ? fleteUnidad() : 0 }, estado.regla);
+/** El flete de cada unidad: el suyo propio (entre sus unidades) más su parte del flete de toda la compra. */
+const fleteDe = (p) => fleteDelProducto(p.flete, p.cantidad) + (Number(p.cantidad) > 0 ? fleteUnidad() : 0);
+const resultado = (p) => calcular({ costo: p.costo, ajuste: p.ajuste, flete: fleteDe(p) }, estado.regla);
+const conTarjetaSiempre = () => estado.regla.tarjetaSiempre !== false && Number(estado.regla.tarjeta) > 0;
 
 /** «de S/ 5 a S/ 20», «menos de S/ 5», «S/ 150 o más». */
 function rango(i) {
@@ -88,22 +92,23 @@ function vistaPrevia() {
     const costo = num($('nuevo-costo').value);
     const caja = $('vista-previa');
     if (!(costo > 0)) { caja.innerHTML = ''; caja.classList.remove('lleno'); return; }
-    const r = calcular({ costo }, estado.regla);
+    const r = calcular({ costo, flete: fleteDelProducto($('nuevo-flete').value.replace(',', '.'), num($('nuevo-cant').value)) }, estado.regla);
     caja.classList.add('lleno');
     caja.innerHTML = `
-        <span class="chip">Costó ${rango(escalonDe(costo, estado.regla))} · +${r.porcentaje} %</span>
+        <span class="chip">Costó ${rango(escalonDe(costo, estado.regla))} · +${r.porcentaje} %${conTarjetaSiempre() ? ` + ${estado.regla.tarjeta} % tarjeta` : ''}</span>
         <span>${precioCorto(r)}</span>
-        <span class="gana-mini">ganas ${soles(r.porDocena ? r.ganas : r.ganasSuelto)}</span>`;
+        <span class="gana-mini">ganas ${soles(r.porDocena ? r.ganas : r.ganasSuelto)}</span>
+        ${r.costoConFlete !== costo ? `<span class="flete-mini">flete ${soles(r.costoConFlete - costo)} c/u → te costó ${soles(r.costoConFlete)}</span>` : ''}`;
 }
-$('nuevo-costo').addEventListener('input', vistaPrevia);
+['nuevo-costo', 'nuevo-cant', 'nuevo-flete'].forEach((id) => $(id).addEventListener('input', vistaPrevia));
 $('nuevo-nombre').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); $('nuevo-costo').focus(); } });
 
 $('form-nuevo').addEventListener('submit', (e) => {
     e.preventDefault();
     const costo = num($('nuevo-costo').value);
     if (!(costo > 0)) { $('nuevo-costo').focus(); avisar('Escribe cuánto te costó.'); return; }
-    agregar([{ nombre: $('nuevo-nombre').value.trim(), costo, cantidad: num($('nuevo-cant').value) || null }]);
-    $('nuevo-nombre').value = ''; $('nuevo-costo').value = ''; $('nuevo-cant').value = '';
+    agregar([{ nombre: $('nuevo-nombre').value.trim(), costo, cantidad: num($('nuevo-cant').value) || null, flete: $('nuevo-flete').value.trim() }]);
+    $('nuevo-nombre').value = ''; $('nuevo-costo').value = ''; $('nuevo-cant').value = ''; $('nuevo-flete').value = '';
     vistaPrevia();
     $('nuevo-nombre').focus();
 });
@@ -111,7 +116,7 @@ $('form-nuevo').addEventListener('submit', (e) => {
 function agregar(lista) {
     const nuevos = lista.map((x, i) => ({
         id: siguienteId++, nombre: x.nombre || `Producto ${estado.productos.length + i + 1}`,
-        costo: x.costo, cantidad: x.cantidad, ajuste: 'normal',
+        costo: x.costo, cantidad: x.cantidad, ajuste: 'normal', flete: x.flete || '',
     }));
     estado.productos = [...nuevos.reverse(), ...estado.productos]; // lo último, arriba
     guardar();
@@ -122,17 +127,19 @@ function agregar(lista) {
 function htmlResultado(p) {
     const r = resultado(p);
     if (!r) return '<p class="falta">Escribe lo que costó.</p>';
-    const tarjeta = estado.regla.tarjetaOn !== false && estado.regla.tarjeta > 0;
+    const siempre = conTarjetaSiempre();
+    const avisarTarjeta = !siempre && Number(estado.regla.tarjeta) > 0;
     const termina8 = !r.porDocena && r.sinRedondear >= estado.regla.terminaEn8Desde && Math.abs(r.sinRedondear - r.suelto) >= 0.5;
     return `
-        <p class="por-que">Costó ${rango(escalonDe(Number(p.costo), estado.regla))}: le sumas <b>${r.porcentaje} %</b>${p.ajuste === 'competencia' ? ' (con competencia)' : p.ajuste === 'rentable' ? ' (rentable)' : ''}</p>
+        <p class="por-que">Costó ${rango(escalonDe(Number(p.costo), estado.regla))}: le sumas <b>${r.porcentaje} %</b>${p.ajuste === 'competencia' ? ' (con competencia)' : p.ajuste === 'rentable' ? ' (rentable)' : ''}${siempre ? ` + <b>${estado.regla.tarjeta} %</b> de tarjeta` : ''}</p>
         <div class="precios">
             ${r.porDocena ? `<div class="precio docena"><span>Docena</span><strong>${soles(r.docena)}</strong><small>${soles(r.docenaUnidad)} c/u</small></div>` : ''}
             <div class="precio suelto${r.porDocena ? '' : ' solo'}"><span>${r.porDocena ? 'Suelto' : 'Precio'}</span><strong>${soles(r.suelto)}</strong>${termina8 ? `<small>en vez de ${soles(r.sinRedondear)}: termina en 8, ya trae su rebaja</small>` : ''}</div>
         </div>
         <p class="gana">Ganas <b>${soles(r.porDocena ? r.ganas : r.ganasSuelto)}</b> c/u${r.porDocena ? ' por docena' : ''}
             · te queda <b>${soles(r.teQueda)}</b>${estado.regla.conFactura ? ' <small>(sin IGV)</small>' : ''}
-            ${tarjeta ? `<br><small>Si te paga con tarjeta te queda ${soles(r.conTarjeta)}</small>` : ''}</p>
+            ${siempre ? `<br><small>Ya descontada la tarjeta (${soles(r.comision)}). Si te paga en efectivo o Yape, te queda ${soles(r.enEfectivo)}.</small>` : ''}
+            ${avisarTarjeta ? `<br><small>Si te paga con tarjeta te queda ${soles(r.conTarjeta)}</small>` : ''}</p>
         ${r.costoConFlete !== Number(p.costo) ? `<p class="con-flete">Con flete te costó ${soles(r.costoConFlete)} c/u</p>` : ''}
         <button type="button" class="clave" data-accion="clave" title="Copiar la clave">
             <span>Clave</span><code>${esc(clave(p.costo, r.porcentaje))}</code><i aria-hidden="true">⧉</i>
@@ -149,6 +156,7 @@ function htmlProducto(p, nuevo) {
         <div class="datos">
             <label>Costo c/u<span class="con-sol"><span aria-hidden="true">S/</span><input data-campo="costo" inputmode="decimal" value="${esc(p.costo)}"></span></label>
             <label>Cantidad<input data-campo="cantidad" inputmode="numeric" placeholder="—" value="${p.cantidad ?? ''}"></label>
+            <label>Flete<span class="con-sol"><span aria-hidden="true">S/</span><input data-campo="flete" inputmode="decimal" placeholder="—" value="${esc(p.flete ?? '')}" aria-label="Flete que pagaste por este producto"></span></label>
         </div>
         <div class="ajuste" role="group" aria-label="Cómo es este producto">
             ${AJUSTES.map((a) => `<button type="button" data-accion="ajuste" data-ajuste="${a.id}" aria-pressed="${(p.ajuste || 'normal') === a.id}">${a.texto}</button>`).join('')}
@@ -222,6 +230,7 @@ $('lista').addEventListener('input', (e) => {
     if (campo === 'nombre') p.nombre = v;
     else if (campo === 'costo') p.costo = num(v);
     else if (campo === 'cantidad') p.cantidad = num(v) || null;
+    else if (campo === 'flete') p.flete = v.trim();
     guardar();
     if (campo === 'cantidad' && num(estado.flete) > 0) repintarResultados();
     else if (campo !== 'nombre') li.querySelector('.resultado').innerHTML = htmlResultado(p);
@@ -335,7 +344,7 @@ function pintarRegla() {
     $('regla-competencia').value = R.ajustes.competencia;
     $('regla-rentable').value = R.ajustes.rentable;
     $('regla-factura').checked = R.conFactura;
-    $('regla-tarjeta-on').checked = R.tarjetaOn !== false && R.tarjeta > 0;
+    $('regla-tarjeta-siempre').checked = R.tarjetaSiempre !== false;
     $('regla-tarjeta').value = R.tarjeta;
 }
 $('abrir-regla').addEventListener('click', () => { pintarRegla(); dRegla.showModal(); });
@@ -349,7 +358,7 @@ dRegla.addEventListener('input', (e) => {
     else if (t.id === 'regla-competencia') R.ajustes.competencia = num(t.value);
     else if (t.id === 'regla-rentable') R.ajustes.rentable = num(t.value);
     else if (t.id === 'regla-factura') R.conFactura = t.checked;
-    else if (t.id === 'regla-tarjeta-on') R.tarjetaOn = t.checked;
+    else if (t.id === 'regla-tarjeta-siempre') R.tarjetaSiempre = t.checked;
     else if (t.id === 'regla-tarjeta') R.tarjeta = num(t.value);
     guardar();
     // Los ejemplos se actualizan sin repintar los campos (no se pierde el cursor).
