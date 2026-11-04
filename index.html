@@ -30,8 +30,13 @@
 
     <main>
         <section class="entrada" aria-labelledby="titulo-entrada">
-            <h1 id="titulo-entrada">¿Cuánto te costó?</h1>
-            <p class="ayuda">Escribe el costo y te digo a cuánto venderlo. <b>Enter</b> y sigues con el siguiente.</p>
+            <div class="entrada-tope">
+                <span class="icono" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M8 6h8M8 10h.01M12 10h.01M16 10h.01M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h4"/></svg></span>
+                <div>
+                    <h1 id="titulo-entrada">¿Cuánto te costó?</h1>
+                    <p class="ayuda">Escribe el costo y te digo a cuánto venderlo. <b>Enter</b> y sigues con el siguiente.</p>
+                </div>
+            </div>
             <form id="form-nuevo" autocomplete="off">
                 <label class="campo campo-nombre">Producto
                     <input id="nuevo-nombre" placeholder="Ej.: Valla fija 30 cm" enterkeyhint="next">

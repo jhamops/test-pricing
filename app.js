@@ -184,9 +184,9 @@ function pintarResumen() {
     }
     t.hidden = false;
     t.innerHTML = `
-        <div><span>Invertiste</span><strong>${soles(invertido)}</strong></div>
-        <div><span>Si vendes todo, ganas</span><strong>${soles(ganas)}</strong></div>
-        <div class="destacado"><span>Te queda${estado.regla.conFactura ? ' (sin IGV)' : ''}</span><strong>${soles(queda)}</strong></div>`;
+        <div class="cifra neutro"><span class="icono" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5M12 13v8"/></svg></span><div><span>Invertiste</span><strong>${soles(invertido)}</strong></div></div>
+        <div class="cifra ok"><span class="icono" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 7-8.5 8.5-5-5L2 17"/><path d="M16 7h6v6"/></svg></span><div><span>Si vendes todo, ganas</span><strong>${soles(ganas)}</strong></div></div>
+        <div class="cifra ok"><span class="icono" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M15 9.5c-.5-1-1.6-1.5-3-1.5-1.7 0-3 .8-3 2s1.3 1.7 3 2 3 .8 3 2-1.3 2-3 2c-1.4 0-2.5-.5-3-1.5M12 6.5V8M12 16v1.5"/></svg></span><div><span>Te queda${estado.regla.conFactura ? ' (sin IGV)' : ''}</span><strong>${soles(queda)}</strong></div></div>`;
 }
 
 // Escribir en una tarjeta: solo se repinta su resultado (no se pierde el cursor).

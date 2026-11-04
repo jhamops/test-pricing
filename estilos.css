@@ -13,7 +13,12 @@
     --sobre-marca: #ffffff;
     --aviso: #b45309;
     --peligro: #be123c;
-    --sombra: 0 10px 30px rgba(2, 6, 23, 0.08);
+    --sombra: 0 1px 2px rgba(2, 6, 23, 0.05);
+    --ok: #047857;
+    --ok-suave: rgba(4, 120, 87, 0.08);
+    --aviso-tinta: #92400e;
+    --aviso-suave: rgba(217, 119, 6, 0.12);
+    --radio: 18px;
 }
 @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
@@ -30,7 +35,11 @@
         --sobre-marca: #020617;
         --aviso: #fbbf24;
         --peligro: #fb7185;
-        --sombra: 0 10px 30px rgba(0, 0, 0, 0.35);
+        --sombra: none;
+        --ok: #34d399;
+        --ok-suave: rgba(52, 211, 153, 0.12);
+        --aviso-tinta: #fbbf24;
+        --aviso-suave: rgba(251, 191, 36, 0.12);
     }
 }
 :root[data-theme="dark"] {
@@ -47,7 +56,11 @@
     --sobre-marca: #020617;
     --aviso: #fbbf24;
     --peligro: #fb7185;
-    --sombra: 0 10px 30px rgba(0, 0, 0, 0.35);
+    --sombra: none;
+        --ok: #34d399;
+        --ok-suave: rgba(52, 211, 153, 0.12);
+        --aviso-tinta: #fbbf24;
+        --aviso-suave: rgba(251, 191, 36, 0.12);
 }
 
 * { box-sizing: border-box; }
@@ -253,3 +266,38 @@ textarea {
     :root:not([data-theme="light"]) .icono-sol { display: block; }
     :root:not([data-theme="light"]) .icono-luna { display: none; }
 }
+
+/* ── Identidad ILLAK: el color nace como luz desde la izquierda (ui/luz.ts) ── */
+.luz, .entrada, .precio.docena, .precio.solo, .cifra, .vista-previa.lleno {
+    --tinte: var(--marca);
+    background: linear-gradient(100deg, color-mix(in srgb, var(--tinte) 14%, var(--superficie)) 0%, var(--superficie) 62%);
+    border: 1px solid color-mix(in srgb, var(--tinte) 22%, var(--borde));
+}
+.entrada { border-radius: var(--radio); box-shadow: var(--sombra); }
+.entrada h1, .entrada .ayuda { background: none; color: inherit; padding: 0; }
+.entrada h1 { font-size: 1.45rem; font-weight: 800; color: var(--texto); letter-spacing: -.01em; }
+.entrada .ayuda { color: var(--texto-2); font-weight: 500; margin-top: 2px; }
+.entrada-tope { display: flex; gap: 12px; align-items: flex-start; padding: 16px 18px 4px; }
+.icono {
+    width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; flex-shrink: 0;
+    background: color-mix(in srgb, var(--tinte, var(--marca)) 12%, transparent); color: var(--tinte, var(--marca));
+}
+.icono svg { width: 20px; height: 20px; }
+.vista-previa.lleno { margin: 10px 18px 0; }
+.producto { border-radius: var(--radio); box-shadow: var(--sombra); }
+.producto.nuevo { border-color: color-mix(in srgb, var(--marca) 45%, var(--borde)); }
+.precio { border-radius: 14px; }
+.precio span { text-transform: none; letter-spacing: 0; font-size: .85rem; font-weight: 650; color: var(--texto); }
+.precio.docena strong, .precio.solo strong { color: var(--ok); }
+.precio strong { font-weight: 800; letter-spacing: -.03em; }
+.precio.suelto:not(.solo) { background: var(--superficie); }
+.con-flete { color: var(--aviso-tinta); }
+.totales { background: none; border: 0; padding: 0; gap: 10px; }
+.totales p { padding: 14px 16px; border-radius: var(--radio); border: 1px dashed var(--borde); background: var(--superficie); }
+.cifra { display: flex; gap: 12px; align-items: flex-start; padding: 12px 16px; border-radius: var(--radio); }
+.cifra.ok { --tinte: var(--ok); }
+.cifra span:not(.icono) { color: var(--texto); font-weight: 650; font-size: .92rem; }
+.cifra strong { font-size: 1.65rem; font-weight: 800; letter-spacing: -.03em; color: var(--tinte); }
+.totales .destacado strong { color: var(--tinte); }
+.boton-principal { box-shadow: none; border-radius: 12px; }
+.marca strong { font-weight: 800; }
