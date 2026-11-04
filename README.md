@@ -43,6 +43,8 @@ Probar en local: `python3 -m http.server` y abrir http://localhost:8000.
 - **Foto o PDF escaneado**: Tesseract (OCR) en el mismo navegador. Antes se endereza la hoja, se pasa a
   blanco y negro y se borran las rayas de la tabla. El importe (cantidad × precio) corrige el punto
   decimal perdido y la cantidad mal leída.
+- **Cómo se trae:** el botón (celular: cámara, galería o archivos; compu: el explorador), **arrastrar y soltar**
+  en cualquier parte de la página (abre la ventana sola), o **Ctrl+V** de una captura. Varios archivos a la vez.
 - **Google Lens / Texto en vivo**: «Copiar texto» y «Pegar lo copiado». Si Lens copia la tabla por
   columnas, se vuelven a armar las filas.
 - Se saltan encabezado, totales y pie (RUC, fecha, IGV…). Nada sale del equipo.

@@ -512,3 +512,19 @@ textarea.nombre { display: block; resize: none; overflow: hidden; line-height: 1
 .fila:has(.revisar) { background: color-mix(in srgb, #d97706 5%, transparent); }
 @media (max-width: 760px) { .tabla td.col-clave .clave { max-width: 100%; letter-spacing: 0; } .tabla td.col-nombre .nombre { padding-top: 2px; padding-bottom: 2px; } }
 @media (max-width: 760px) { .tabla td.col-docena::before { content: none; } .tabla td.col-docena { align-items: flex-start; } .tabla td.col-docena .interr::after { content: ' por docena'; font-weight: 700; } }
+
+/* Arrastrar y soltar (compu) */
+.solo-compu { display: none; }
+@media (hover: hover) and (pointer: fine) { .solo-compu { display: block; } }
+kbd { font-family: inherit; font-weight: 800; font-size: .85em; padding: 1px 6px; border: 1px solid var(--borde); border-bottom-width: 2px; border-radius: 6px; background: var(--elevado); }
+.traer.ocupado .traer-archivo, .traer.ocupado button { opacity: .6; pointer-events: none; }
+.soltar-aqui { display: none; }
+body.arrastrando .soltar-aqui {
+    display: grid; place-items: center; position: fixed; inset: 0; z-index: 2147483647; pointer-events: none;
+    background: color-mix(in srgb, var(--marca) 22%, rgba(2, 6, 23, .45));
+}
+.soltar-aqui span {
+    padding: 22px 30px; border: 3px dashed var(--marca); border-radius: 18px; background: var(--superficie);
+    color: var(--texto); font-weight: 900; font-size: 1.3rem; box-shadow: var(--sombra);
+}
+body.arrastrando dialog[open] .traer { outline: 3px dashed var(--marca); outline-offset: 6px; border-radius: 14px; }

@@ -160,9 +160,10 @@
             </div>
             <div class="dialogo-cuerpo">
                 <div class="traer">
-                    <label class="boton-principal chico traer-archivo">Foto o PDF de la factura<input type="file" id="archivo" accept="image/*,application/pdf"></label>
+                    <label class="boton-principal chico traer-archivo">Foto o PDF de la factura<input type="file" id="archivo" accept="image/*,application/pdf" multiple></label>
                     <button type="button" class="boton-secundario" id="pegar-portapapeles">Pegar lo copiado</button>
                 </div>
+                <p class="solo-compu ayuda chico">O arrástralo aquí, o pega una captura con <kbd>Ctrl</kbd>+<kbd>V</kbd>. Puedes traer varios a la vez.</p>
                 <p class="estado-archivo" id="estado-archivo" aria-live="polite" hidden></p>
                 <p class="ayuda chico">¿La foto sale mal? Ábrela con <b>Google Lens</b>, toca «Copiar texto» y aquí «Pegar lo copiado».</p>
                 <p class="ayuda chico">O escríbelo, una línea por producto:</p>
@@ -187,6 +188,7 @@
     </dialog>
 
     <div class="aviso" id="aviso" role="status" hidden></div>
+    <div class="soltar-aqui" aria-hidden="true"><span>Suelta la factura (foto o PDF)</span></div>
 
     <script type="module" src="app.js"></script>
 </body>

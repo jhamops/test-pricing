@@ -390,11 +390,12 @@ const leido = () => {
     const { productos, sinPrecio } = leerLista($('pegado').value, { foto: deFoto });
     return { sinPrecio, productos: productos.map((x, i) => ({ ...x, i, docena: docenaPegada.has(`${i}|${x.nombre}`) ? docenaPegada.get(`${i}|${x.nombre}`) : x.docena, pct: pctPegar })) };
 };
-$('abrir-pegar').addEventListener('click', () => {
+function abrirPegar() {
     $('pegado').value = ''; deFoto = false; docenaPegada.clear(); pctPegar = pctNuevo; estadoArchivo('');
     $('pegar-pct').innerHTML = htmlPorcentajes(pctPegar);
     vistaPegado(); dPegar.showModal(); $('pegado').focus();
-});
+}
+$('abrir-pegar').addEventListener('click', abrirPegar);
 function vistaPegado() {
     const { productos, sinPrecio } = leido();
     const esOtro = !PORCENTAJES.includes(Number(pctPegar));
@@ -438,40 +439,73 @@ $('pegar-portapapeles').addEventListener('click', async () => {
         $('pegado').focus();
     }
 });
-$('archivo').addEventListener('change', async (e) => {
-    const archivo = e.target.files && e.target.files[0];
-    e.target.value = '';
-    if (!archivo) return;
-    const botones = dPegar.querySelectorAll('.traer button, .traer input');
-    botones.forEach((b) => { b.disabled = true; });
-    dPegar.querySelector('.traer-archivo').classList.add('ocupado');
+// Una sola entrada para todo lo que trae archivos: el botón (celular: cámara, galería o
+// archivos; compu: el explorador), arrastrar y soltar, y pegar una captura con Ctrl+V.
+const esArchivoQueSirve = (f) => f && (/^image\//.test(f.type) || f.type === 'application/pdf' || /\.(pdf|jpe?g|png|webp|heic)$/i.test(f.name || ''));
+let leyendo = false;
+async function leerArchivos(lista) {
+    const archivos = [...(lista || [])].filter(esArchivoQueSirve);
+    if (!archivos.length) { if (dPegar.open) estadoArchivo('Eso no es una foto ni un PDF.', true); else avisar('Eso no es una foto ni un PDF.'); return; }
+    if (leyendo) return;
+    leyendo = true;
+    if (!dPegar.open) abrirPegar();
+    const caja = dPegar.querySelector('.traer');
+    caja.classList.add('ocupado');
     const inicio = performance.now();
+    let pdf = 0, fotos = 0, fallos = 0;
+    const antes = leerLista($('pegado').value, { foto: deFoto }).productos.length;
     try {
         const { leerArchivo } = await import('./lector.js');
-        let { texto, como } = await leerArchivo(archivo, (t) => estadoArchivo(t));
-        if (como === 'ocr') {
-            deFoto = true;
-            // Si alguna fila no cuadra con su importe, se lee otra vez con más detalle y se
-            // queda la lectura que más filas cuadra (cada foto sale mejor a un tamaño distinto).
-            const puntaje = (t) => leerLista(t, { foto: true }).productos.filter((p) => !p.dudoso && p.cantidad).length;
-            const dudas = leerLista(texto, { foto: true }).productos.filter((p) => p.dudoso).length;
-            if (dudas > 0) {
-                const otra = await leerArchivo(archivo, (t) => estadoArchivo(`Revisando con más detalle… ${t.replace(/^Leyendo… /, '')}`), { objetivo: 3800 });
-                if (puntaje(otra.texto) > puntaje(texto)) texto = otra.texto;
-            }
+        for (const [n, archivo] of archivos.entries()) {
+            const cual = archivos.length > 1 ? `Archivo ${n + 1} de ${archivos.length}: ` : '';
+            try {
+                let { texto, como } = await leerArchivo(archivo, (t) => estadoArchivo(cual + t));
+                if (como === 'ocr') {
+                    deFoto = true;
+                    // Si alguna fila no cuadra con su importe, se lee otra vez con más detalle y se
+                    // queda la lectura que más filas cuadra (cada foto sale mejor a un tamaño distinto).
+                    const puntaje = (t) => leerLista(t, { foto: true }).productos.filter((p) => !p.dudoso && p.cantidad).length;
+                    if (leerLista(texto, { foto: true }).productos.some((p) => p.dudoso)) {
+                        const otra = await leerArchivo(archivo, (t) => estadoArchivo(`${cual}Revisando con más detalle… ${t.replace(/^Leyendo… /, '')}`), { objetivo: 3800 });
+                        if (puntaje(otra.texto) > puntaje(texto)) texto = otra.texto;
+                    }
+                    fotos++;
+                } else pdf++;
+                sumarTexto(texto);
+            } catch (err) { console.error(err); fallos++; }
         }
         const segundos = Math.max(1, Math.round((performance.now() - inicio) / 1000));
-        const antes = leerLista($('pegado').value, { foto: deFoto }).productos.length;
-        sumarTexto(texto);
         const nuevos = leerLista($('pegado').value, { foto: deFoto }).productos.length - antes;
-        estadoArchivo(`${como === 'pdf' ? 'Leído del PDF' : 'Leído de la foto'} en ${segundos} s: ${nuevos} ${nuevos === 1 ? 'producto' : 'productos'}.${como === 'ocr' ? ' Revisa los precios: la foto puede confundir números.' : ''}`);
-    } catch (err) {
-        console.error(err);
-        estadoArchivo('No pude leer ese archivo. Prueba con otra foto (derecha y con luz) o con Google Lens.', true);
+        if (!pdf && !fotos) estadoArchivo('No pude leer ese archivo. Prueba con otra foto (derecha y con luz) o con Google Lens.', true);
+        else estadoArchivo(`${fotos ? 'Leído de la foto' : 'Leído del PDF'}${archivos.length > 1 ? ` (${archivos.length - fallos} archivos)` : ''} en ${segundos} s: ${nuevos} ${nuevos === 1 ? 'producto' : 'productos'}.${fotos ? ' Revisa los precios: la foto puede confundir números.' : ''}${fallos ? ` ${fallos} no se pudo leer.` : ''}`);
     } finally {
-        botones.forEach((b) => { b.disabled = false; });
-        dPegar.querySelector('.traer-archivo').classList.remove('ocupado');
+        caja.classList.remove('ocupado');
+        leyendo = false;
     }
+}
+$('archivo').addEventListener('change', (e) => {
+    const archivos = [...(e.target.files || [])];
+    e.target.value = '';
+    if (archivos.length) leerArchivos(archivos);
+});
+// Arrastrar y soltar: en la ventana o en cualquier parte de la página (la abre sola).
+const traeArchivos = (e) => [...(e.dataTransfer?.types || [])].includes('Files');
+let arrastres = 0;
+addEventListener('dragenter', (e) => { if (!traeArchivos(e)) return; e.preventDefault(); arrastres++; document.body.classList.add('arrastrando'); });
+addEventListener('dragover', (e) => { if (!traeArchivos(e)) return; e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; });
+addEventListener('dragleave', (e) => { if (!traeArchivos(e)) return; arrastres = Math.max(0, arrastres - 1); if (!arrastres) document.body.classList.remove('arrastrando'); });
+addEventListener('drop', (e) => {
+    if (!traeArchivos(e)) return;
+    e.preventDefault();
+    arrastres = 0; document.body.classList.remove('arrastrando');
+    leerArchivos(e.dataTransfer.files);
+});
+// Pegar una captura (Ctrl+V) en la ventana: si lo copiado es una imagen, se lee; si es texto, se pega como siempre.
+dPegar.addEventListener('paste', (e) => {
+    const archivos = [...(e.clipboardData?.files || [])].filter(esArchivoQueSirve);
+    if (!archivos.length) return;
+    e.preventDefault();
+    leerArchivos(archivos);
 });
 $('pegar-pct').addEventListener('click', (e) => {
     const b = e.target.closest('[data-pct]');
