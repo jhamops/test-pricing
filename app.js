@@ -54,6 +54,7 @@ $('tema').addEventListener('click', () => {
 // ── La cuenta ──────────────────────────────────────────────────────────────
 const fleteDe = (p) => fleteDeCalc(p, estado.productos, num(estado.flete));
 const resultado = (p) => calcular({ costo: p.costo, pct: p.pct, docena: Boolean(p.docena), flete: fleteDe(p) }, estado.regla);
+const usaDocena = () => estado.regla.usaDocena === true;
 const conTarjeta = () => estado.regla.tarjetaSiempre !== false && Number(estado.regla.tarjeta) > 0;
 
 // ── Aviso con «Deshacer» ───────────────────────────────────────────────────
@@ -139,6 +140,7 @@ function agregar(lista) {
     const nuevos = lista.map((x, i) => ({
         id: siguienteId++, nombre: x.nombre || `Producto ${estado.productos.length + i + 1}`,
         costo: x.costo, cantidad: x.cantidad, pct: x.pct ?? estado.ultimoPct, flete: x.flete || '', docena: Boolean(x.docena),
+        ...(x.dudoso ? { revisar: true } : {}),
     }));
     estado.productos = [...nuevos.reverse(), ...estado.productos]; // lo último, arriba
     guardar();
@@ -162,21 +164,21 @@ function htmlFila(p, nuevo) {
     const faltaCant = num(estado.flete) > 0 && !(Number(p.cantidad) > 0);
     return `
     <tr class="fila${nuevo ? ' nuevo' : ''}" data-id="${p.id}">
-        <td data-label="Producto" class="col-nombre"><input class="nombre" data-campo="nombre" value="${esc(p.nombre)}" aria-label="Producto"></td>
-        <td data-label="Compra" class="num"><span class="con-sol"><span aria-hidden="true">S/</span><input data-campo="costo" inputmode="decimal" value="${esc(p.costo)}" aria-label="Precio de compra"></span><span class="calc" data-c="compra">${c.compra}</span></td>
-        <td data-label="Cant." class="num"><input class="cant${faltaCant ? ' falta-cant' : ''}" data-campo="cantidad" inputmode="numeric" placeholder="—" value="${p.cantidad ?? ''}" aria-label="Cantidad"></td>
-        <td data-label="Flete" class="num"><span class="con-sol"><span aria-hidden="true">S/</span><input data-campo="flete" inputmode="decimal" placeholder="—" value="${esc(p.flete ?? '')}" aria-label="Flete de este producto"></span></td>
-        <td data-label="Ganancia" class="num">
+        <td data-label="Producto" class="col-nombre"><textarea class="nombre" data-campo="nombre" rows="1" aria-label="Producto">${esc(p.nombre)}</textarea>${p.revisar ? '<span class="revisar">⚠ Revisa la compra y la cantidad: la foto no se leyó bien</span>' : ''}</td>
+        <td data-label="Compra" class="num col-compra"><span class="con-sol"><span aria-hidden="true">S/</span><input data-campo="costo" inputmode="decimal" value="${esc(p.costo)}" aria-label="Precio de compra"></span><span class="calc" data-c="compra">${c.compra}</span></td>
+        <td data-label="Cant." class="num col-cant"><input class="cant${faltaCant ? ' falta-cant' : ''}" data-campo="cantidad" inputmode="numeric" placeholder="—" value="${p.cantidad ?? ''}" aria-label="Cantidad"></td>
+        <td data-label="Flete" class="num col-flete"><span class="con-sol"><span aria-hidden="true">S/</span><input data-campo="flete" inputmode="decimal" placeholder="—" value="${esc(p.flete ?? '')}" aria-label="Flete de este producto"></span></td>
+        <td data-label="Ganancia" class="num col-pct">
             <span class="paso-pct">
                 <button type="button" data-accion="menos" aria-label="5 menos">−</button>
                 <input data-campo="pct" inputmode="decimal" value="${esc(p.pct)}" aria-label="Ganancia en por ciento"><span aria-hidden="true">%</span>
                 <button type="button" data-accion="mas" aria-label="5 más">+</button>
             </span>
         </td>
-        <td data-label="Docena"><button type="button" class="interr chico" data-accion="docena" aria-pressed="${Boolean(p.docena)}" aria-label="Por docena">x12</button></td>
-        <td data-label="Precio" class="num calc" data-c="precio">${c.precio}</td>
-        <td data-label="Ganas c/u" class="num calc" data-c="ganas">${c.ganas}</td>
-        <td data-label="Clave" class="calc" data-c="clave">${c.clave}</td>
+        ${usaDocena() ? `<td data-label="Docena" class="col-docena"><button type="button" class="interr chico" data-accion="docena" aria-pressed="${Boolean(p.docena)}" aria-label="Por docena">x12</button></td>` : ''}
+        <td data-label="Precio" class="num calc col-precio" data-c="precio">${c.precio}</td>
+        <td data-label="Ganas c/u" class="num calc col-ganas" data-c="ganas">${c.ganas}</td>
+        <td data-label="Clave" class="calc col-clave" data-c="clave">${c.clave}</td>
         <td class="col-quitar"><button type="button" class="quitar" data-accion="quitar" aria-label="Quitar ${esc(p.nombre)}">✕</button></td>
     </tr>`;
 }
@@ -193,9 +195,17 @@ function repintarFilas() {
     });
 }
 
+// «Por docena» solo se ve si ella lo prende en «Tu regla» (son pocos productos).
+function pintarDocena() {
+    $('th-docena').hidden = !usaDocena();
+    $('nuevo-docena').hidden = !usaDocena();
+    if (!usaDocena() && docenaNueva) { docenaNueva = false; $('nuevo-docena').setAttribute('aria-pressed', 'false'); vistaPrevia(); }
+}
 function pintarTodo(nuevos = new Set()) {
     const hay = estado.productos.length > 0;
     $('lista').innerHTML = estado.productos.map((p) => htmlFila(p, nuevos.has(p.id))).join('');
+    requestAnimationFrame(() => $('lista').querySelectorAll('textarea.nombre').forEach(crecer));
+    pintarDocena();
     $('barra').hidden = !hay;
     $('tabla-caja').hidden = !hay;
     $('vacio').hidden = hay;
@@ -236,6 +246,10 @@ function pintarResumen() {
 }
 
 // Escribir en una fila: solo se repintan sus celdas calculadas (no se pierde el cursor).
+// El nombre baja de línea si es largo (en el celular no se corta).
+function crecer(t) { t.style.height = 'auto'; t.style.height = `${t.scrollHeight}px`; }
+addEventListener('resize', () => $('lista').querySelectorAll('textarea.nombre').forEach(crecer));
+$('lista').addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.matches('textarea.nombre')) { e.preventDefault(); e.target.blur(); } });
 $('lista').addEventListener('input', (e) => {
     const tr = e.target.closest('.fila');
     const campo = e.target.dataset.campo;
@@ -243,10 +257,11 @@ $('lista').addEventListener('input', (e) => {
     const p = estado.productos.find((x) => x.id === Number(tr.dataset.id));
     if (!p) return;
     const v = e.target.value;
-    if (campo === 'nombre') p.nombre = v;
+    if (campo === 'nombre') { p.nombre = v.replace(/\n/g, ' '); crecer(e.target); }
     else if (campo === 'costo') p.costo = num(v);
     else if (campo === 'cantidad') p.cantidad = num(v) || null;
     else if (campo === 'flete') p.flete = v.trim();
+    if ((campo === 'costo' || campo === 'cantidad') && p.revisar) { delete p.revisar; tr.querySelector('.revisar')?.remove(); }
     else if (campo === 'pct') { if (v.trim() === '') return; p.pct = num(v); estado.ultimoPct = p.pct; }
     guardar();
     // La cantidad cambia el reparto del flete de toda la compra: se repintan todas.
@@ -369,13 +384,14 @@ $('vaciar').addEventListener('click', () => {
 // se dice (no se pierde callado). La «x12» de cada fila se recuerda por línea.
 const dPegar = $('dialogo-pegar');
 let pctPegar = pctNuevo;
+let deFoto = false; // ¿se leyó una foto? Entonces se descartan los renglones basura del OCR.
 const docenaPegada = new Map(); // línea → ¿por docena? (lo que ella tocó en la vista)
 const leido = () => {
-    const { productos, sinPrecio } = leerLista($('pegado').value);
+    const { productos, sinPrecio } = leerLista($('pegado').value, { foto: deFoto });
     return { sinPrecio, productos: productos.map((x, i) => ({ ...x, i, docena: docenaPegada.has(`${i}|${x.nombre}`) ? docenaPegada.get(`${i}|${x.nombre}`) : x.docena, pct: pctPegar })) };
 };
 $('abrir-pegar').addEventListener('click', () => {
-    $('pegado').value = ''; docenaPegada.clear(); pctPegar = pctNuevo; estadoArchivo('');
+    $('pegado').value = ''; deFoto = false; docenaPegada.clear(); pctPegar = pctNuevo; estadoArchivo('');
     $('pegar-pct').innerHTML = htmlPorcentajes(pctPegar);
     vistaPegado(); dPegar.showModal(); $('pegado').focus();
 });
@@ -388,11 +404,12 @@ function vistaPegado() {
         const r = calcular({ costo: x.costo, pct: x.pct, docena: x.docena, flete: fleteDelProducto(x.flete, x.cantidad) }, estado.regla);
         const detalle = [`compra ${soles(x.costo)}`, x.cantidad ? `${x.cantidad} und` : '', x.flete ? `flete ${soles(x.flete)}` : ''].filter(Boolean).join(' · ');
         const precio = r.porDocena ? `${soles(r.docenaUnidad)}<small>docena · suelto ${soles(r.suelto)}</small>` : soles(r.suelto);
-        return `<li><span class="pg-nombre"><b>${esc(x.nombre)}</b><small>${detalle}</small></span>
-            <button type="button" class="interr chico" data-pg-docena="${x.i}|${esc(x.nombre)}" aria-pressed="${x.docena}" aria-label="Por docena">x12</button>
+        const revisa = x.dudoso ? '<em class="pg-revisa">Revisa: no cuadra con el importe</em>' : '';
+        return `<li${x.dudoso ? ' class="dudoso"' : ''}><span class="pg-nombre"><b>${esc(x.nombre)}</b><small>${detalle}</small>${revisa}</span>
+            ${usaDocena() ? `<button type="button" class="interr chico" data-pg-docena="${x.i}|${esc(x.nombre)}" aria-pressed="${x.docena}" aria-label="Por docena">x12</button>` : ''}
             <span class="pg-precio">${precio}</span></li>`;
     }).join('');
-    const { saltadas } = leerLista($('pegado').value);
+    const { saltadas } = leerLista($('pegado').value, { foto: deFoto });
     const saltos = saltadas.length ? `<p class="pg-saltadas">Salté ${saltadas.length} ${saltadas.length === 1 ? 'línea' : 'líneas'} que no son productos (RUC, fecha, totales…).</p>` : '';
     const malas = sinPrecio.length
         ? `<p class="pg-malas"><b>Sin precio, no ${sinPrecio.length === 1 ? 'entra' : 'entran'}:</b> ${sinPrecio.slice(0, 4).map((t) => `«${esc(t)}»`).join(', ')}${sinPrecio.length > 4 ? ` y ${sinPrecio.length - 4} más` : ''}</p>` : '';
@@ -431,11 +448,22 @@ $('archivo').addEventListener('change', async (e) => {
     const inicio = performance.now();
     try {
         const { leerArchivo } = await import('./lector.js');
-        const { texto, como } = await leerArchivo(archivo, (t) => estadoArchivo(t));
+        let { texto, como } = await leerArchivo(archivo, (t) => estadoArchivo(t));
+        if (como === 'ocr') {
+            deFoto = true;
+            // Si alguna fila no cuadra con su importe, se lee otra vez con más detalle y se
+            // queda la lectura que más filas cuadra (cada foto sale mejor a un tamaño distinto).
+            const puntaje = (t) => leerLista(t, { foto: true }).productos.filter((p) => !p.dudoso && p.cantidad).length;
+            const dudas = leerLista(texto, { foto: true }).productos.filter((p) => p.dudoso).length;
+            if (dudas > 0) {
+                const otra = await leerArchivo(archivo, (t) => estadoArchivo(`Revisando con más detalle… ${t.replace(/^Leyendo… /, '')}`), { objetivo: 3800 });
+                if (puntaje(otra.texto) > puntaje(texto)) texto = otra.texto;
+            }
+        }
         const segundos = Math.max(1, Math.round((performance.now() - inicio) / 1000));
-        const antes = leerLista($('pegado').value).productos.length;
+        const antes = leerLista($('pegado').value, { foto: deFoto }).productos.length;
         sumarTexto(texto);
-        const nuevos = leerLista($('pegado').value).productos.length - antes;
+        const nuevos = leerLista($('pegado').value, { foto: deFoto }).productos.length - antes;
         estadoArchivo(`${como === 'pdf' ? 'Leído del PDF' : 'Leído de la foto'} en ${segundos} s: ${nuevos} ${nuevos === 1 ? 'producto' : 'productos'}.${como === 'ocr' ? ' Revisa los precios: la foto puede confundir números.' : ''}`);
     } catch (err) {
         console.error(err);
@@ -483,6 +511,8 @@ function pintarEjemplos() {
 function pintarRegla() {
     const R = estado.regla;
     pintarEjemplos();
+    $('regla-docena-on').checked = R.usaDocena === true;
+    $('regla-docena-detalle').hidden = R.usaDocena !== true;
     $('regla-8-on').checked = R.terminaEn8On !== false;
     $('regla-suelto').value = R.recargoSuelto;
     $('regla-al-sol').value = R.redondeoAlSolDesde;
@@ -494,6 +524,7 @@ function pintarRegla() {
 $('abrir-regla').addEventListener('click', () => { pintarRegla(); dRegla.showModal(); });
 dRegla.addEventListener('input', (e) => {
     const t = e.target, R = estado.regla;
+    if (t.id === 'regla-docena-on') { R.usaDocena = t.checked; $('regla-docena-detalle').hidden = !t.checked; guardar(); pintarTodo(); return; }
     if (t.id === 'regla-8-on') R.terminaEn8On = t.checked;
     else if (t.id === 'regla-suelto') R.recargoSuelto = num(t.value);
     else if (t.id === 'regla-al-sol') R.redondeoAlSolDesde = num(t.value);

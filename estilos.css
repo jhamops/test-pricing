@@ -419,27 +419,48 @@ textarea {
 .paso-pct > span { color: var(--texto-2); font-weight: 700; margin-right: 4px; }
 
 /* Celular: cada producto, una fila compacta en dos columnas. */
+/* En el celular cada producto es una tarjeta: el nombre, el PRECIO grande (lo que ella
+   busca), y debajo lo que se toca: compra, cantidad, flete y la ganancia. */
 @media (max-width: 760px) {
     .tabla thead { display: none; }
     .tabla, .tabla tbody { display: block; }
     .tabla tr.fila {
-        display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; padding: 12px; border-top: 1px solid var(--borde);
+        position: relative; display: grid; gap: 10px 8px; padding: 14px 12px; border-top: 1px solid var(--borde);
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+        grid-template-areas:
+            "nom nom nom nom nom nom"
+            "pre pre pre gan gan gan"
+            "com com can can fle fle"
+            "pct pct pct pct cla cla"
+            "doc doc doc doc doc doc";
     }
     .tabla tr.fila:first-child { border-top: 0; }
-    .tabla td { display: flex; flex-direction: column; gap: 3px; padding: 0; border: 0; text-align: left !important; }
-    .tabla td::before { content: attr(data-label); font-size: .72rem; font-weight: 800; color: var(--texto-3); }
-    .tabla td.col-nombre { grid-column: 1 / span 1; grid-row: 1; }
-    .tabla td.col-quitar { grid-column: 2; grid-row: 1; align-items: flex-end; }
+    .tabla td { display: flex; flex-direction: column; gap: 3px; padding: 0; border: 0; text-align: left !important; min-width: 0; }
+    .tabla td::before { content: attr(data-label); font-size: .78rem; font-weight: 800; color: var(--texto-3); }
+    .tabla td.col-nombre { grid-area: nom; padding-right: 48px; }
+    .tabla td.col-nombre::before { content: none; }
+    .tabla td.col-nombre .nombre { font-size: 1.08rem; font-weight: 800; padding-left: 0; border-color: transparent; background: transparent; }
+    .tabla td.col-quitar { position: absolute; top: 12px; right: 10px; }
     .tabla td.col-quitar::before { content: none; }
-    .tabla td.col-nombre { grid-column: 1 / -1; padding-right: 50px; }
-    .tabla .con-sol { width: 100%; }
-    .tabla .cant { width: 100%; }
+    .tabla td.col-precio { grid-area: pre; }
+    .tabla td.col-precio::before { content: 'Precio de venta'; }
+    .tabla td.col-precio b { font-size: 1.7rem; line-height: 1.1; }
+    .tabla td.col-ganas { grid-area: gan; align-items: flex-end; text-align: right !important; justify-content: flex-end; }
+    .tabla td.col-ganas::before { content: 'Ganas c/u'; }
+    .tabla td.col-ganas b { font-size: 1.15rem; }
+    .tabla td.col-compra { grid-area: com; }
+    .tabla td.col-cant { grid-area: can; }
+    .tabla td.col-flete { grid-area: fle; }
+    .tabla td.col-pct { grid-area: pct; }
+    .tabla td.col-clave { grid-area: cla; align-items: flex-end; justify-content: flex-end; }
+    .tabla td.col-docena { grid-area: doc; }
+    .tabla td.col-docena:empty { display: none; }
+    .tabla td .con-sol, .tabla td .cant { width: 100%; }
+    .tabla .paso-pct { width: 100%; justify-content: space-between; }
+    .tabla .paso-pct button { width: 44px; }
+    .tabla td.col-compra small { white-space: nowrap; }
 }
 @media print { .flete-total, .botones-barra, .col-quitar, .paso-pct button { display: none !important; } }
-@media (max-width: 760px) {
-    .tabla tr.fila { position: relative; }
-    .tabla td.col-quitar { position: absolute; top: 10px; right: 10px; }
-}
 .interr {
     min-height: 44px; padding: 0 14px; border-radius: 12px; font-weight: 800; font-size: .95rem;
     border: 1px solid var(--borde); background: var(--superficie); color: var(--texto-2);
@@ -483,3 +504,11 @@ textarea {
 .estado-archivo.error { background: color-mix(in srgb, #dc2626 12%, var(--superficie)); }
 .pg-saltadas { margin: 8px 0 0; color: var(--texto-3); font-size: .9rem; }
 .ayuda.chico + .ayuda.chico { margin-top: -4px; }
+.pg-lista li.dudoso { background: color-mix(in srgb, #d97706 10%, transparent); border-radius: 10px; padding-left: 8px; padding-right: 8px; }
+.pg-revisa { font-style: normal; font-weight: 800; font-size: .85rem; color: var(--texto); }
+.pg-revisa::before { content: '⚠ '; color: #d97706; }
+textarea.nombre { display: block; resize: none; overflow: hidden; line-height: 1.3; padding-top: 8px; padding-bottom: 8px; field-sizing: content; font-family: inherit; }
+.revisar { display: block; margin-top: 4px; padding: 4px 8px; border-radius: 8px; font-size: .85rem; font-weight: 700; color: var(--texto); background: color-mix(in srgb, #d97706 14%, var(--superficie)); white-space: normal; }
+.fila:has(.revisar) { background: color-mix(in srgb, #d97706 5%, transparent); }
+@media (max-width: 760px) { .tabla td.col-clave .clave { max-width: 100%; letter-spacing: 0; } .tabla td.col-nombre .nombre { padding-top: 2px; padding-bottom: 2px; } }
+@media (max-width: 760px) { .tabla td.col-docena::before { content: none; } .tabla td.col-docena { align-items: flex-start; } .tabla td.col-docena .interr::after { content: ' por docena'; font-weight: 700; } }

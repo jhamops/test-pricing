@@ -48,3 +48,19 @@ Probar en local: `python3 -m http.server` y abrir http://localhost:8000.
 - Se saltan encabezado, totales y pie (RUC, fecha, IGV…). Nada sale del equipo.
 - Librerías en `vendor/` (tesseract.js 7, modelo español `best_int`, pdf.js 4.10 legacy; Apache-2.0).
   Se descargan la primera vez que se usan (~6 MB) y el navegador las guarda.
+
+### Lo que se probó (factura de natación inventada: lentes Arena, jammer, gorros)
+
+| Archivo | Exactos | Marcados «Revisa» |
+|---|---|---|
+| PDF con texto | 6/6 | 0 |
+| PDF escaneado | 6/6 | 0 |
+| Foto de WhatsApp (achicada, girada) | 6/6 | 1 renglón basura |
+| Foto torcida con perspectiva y sombra | 3/6 | los otros 3 |
+
+En una foto de factura, toda fila que no cuadra cantidad × precio = importe se marca «Revisa» (también en
+la lista, hasta que se corrige la compra o la cantidad): un precio mal leído nunca entra callado. Se toma el
+**precio unitario con IGV** (lo que se pagó), no el valor sin IGV; el código del proveedor y la talla («T-28»)
+no se confunden con la cantidad.
+
+«Por docena» está apagado: se prende en «Tu regla» (paso 1) y recién ahí aparece el botón «x12».

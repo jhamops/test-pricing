@@ -27,6 +27,7 @@ export const REGLA_INICIAL = {
         { hasta: null, pct: 25 },
     ],
     porDocenaOn: true, // ¿se saca precio por docena? (opcional)
+    usaDocena: false, // ¿se ve el botón «x12»? Pocos productos se venden por docena: apagado, se prende en «Tu regla».
     docenaHasta: 18, // lo que cuesta menos que esto se vende por docena y suelto
     recargoSuelto: 15, // el suelto, este % más que la unidad por docena
     redondeoAlSolDesde: 10, // desde este precio se redondea al sol (antes, a 10 céntimos)
@@ -158,6 +159,8 @@ const UNIDADES = String.raw`(?:und|unds|unid|unidades|uds?|u|niu|nius|pzas?|piez
 const NUMERO = /(?<![\w.,°/#:-])(\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:[.,]\d+)?)(?![\w°%/:-]|[.,]\d)/g;
 const aNumero = (t) => Number(/^\d{1,3}(,\d{3})+(\.\d+)?$/.test(t) ? t.replace(/,/g, '') : t.replace(',', '.'));
 const casi = (a, b) => Math.abs(a - b) <= Math.max(0.05, b * 0.01);
+/** cantidad × precio = importe, con la tolerancia del redondeo del precio a céntimos (no un %). */
+const cuadra = (q, p, t) => Math.abs(q * p - t) <= 0.06 + q * 0.005;
 
 function quitar(linea, m) {
     return linea.slice(0, m.index) + ' '.repeat(m[0].length) + linea.slice(m.index + m[0].length);
@@ -172,78 +175,125 @@ function leerLinea(cruda) {
         .replace(/\bS\s*\/\s*\.?/gi, '  ').replace(/\bc\s*\/\s*u\b\.?/gi, '   ').replace(/\bPEN\b/g, '   ');
 
     // Lo que deja la cuadrícula de una tabla leída de una foto: rayas, barras, comillas.
-    l = l.replace(/[_—“”"`|¦!]+/g, (t) => ' '.repeat(t.length));
+    l = l.replace(/[_—“”"`|¦!’‘»«\[\]{}]+/g, (t) => ' '.repeat(t.length)).replace(/(?<=\s)\*+(?=\s|-)/g, (t) => ' '.repeat(t.length));
     let cantidad = null, docena = false, flete = '', docenaEsPrecio = false, m;
+    const marcas = []; // dónde se sacó un dato: en una fila, el nombre termina en el primero
+    const quitarAqui = (mm) => { marcas.push(mm.index); l = quitar(l, mm); };
     // flete 5
-    if ((m = l.match(/\bflete\s*:?\s*(\d+(?:[.,]\d+)?)/i))) { flete = String(aNumero(m[1])); l = quitar(l, m); }
+    if ((m = l.match(/\bflete\s*:?\s*(\d+(?:[.,]\d+)?)/i))) { flete = String(aNumero(m[1])); quitarAqui(m); }
     // «42 la docena», «docena a 42», «x docena 42» → el precio es de la docena
     if ((m = l.match(/(\d+(?:[.,]\d+)?)\s*(?:la|x|por|el)\s*(?:docena|doc|dz)\b\.?/i))) {
-        docena = true; docenaEsPrecio = true; l = quitar(l, { index: m.index + m[1].length, 0: m[0].slice(m[1].length) });
+        docena = true; docenaEsPrecio = true; quitarAqui({ index: m.index + m[1].length, 0: m[0].slice(m[1].length) });
     } else if ((m = l.match(/\b(?:la\s*)?(?:docena|doc|dz)\b\.?\s*(?:a|en|:)?\s*(?=\d)/i))) {
-        docena = true; docenaEsPrecio = true; l = quitar(l, m);
-    } else if ((m = l.match(/\b(?:x\s*|por\s*)?(?:docena|doc|dz)\b\.?/i))) { docena = true; l = quitar(l, m); }
+        docena = true; docenaEsPrecio = true; quitarAqui(m);
+    } else if ((m = l.match(/\b(?:x\s*|por\s*)?(?:docena|doc|dz)\b\.?/i))) { docena = true; quitarAqui(m); }
     // cantidad: «x 24», «24 und», «por 24»
-    if ((m = l.match(new RegExp(String.raw`\bx\s*(\d+)\b(?![.,]\d)|(?<![\w.,])(\d+)\s*${UNIDADES}|\bpor\s+(\d+)\b(?![.,]\d)(?!\s*${MEDIDA})`, 'i')))) {
-        cantidad = Number(m[1] || m[2] || m[3]); l = quitar(l, m);
+    // («T-28 NIU» es una talla, no 28 unidades: lo pegado a un guion no cuenta). Factura con la
+    // unidad antes: «NIU 12».
+    if ((m = l.match(new RegExp(String.raw`\bx\s*(\d+)\b(?![.,]\d)|(?<![\w.,-])(\d+)\s*${UNIDADES}|\bpor\s+(\d+)\b(?![.,]\d)(?!\s*${MEDIDA})|\b(?:niu|nius|[il1]?n[il1]?u|und|unid|zz)\.?\s+(\d{1,6})\b(?![.,]\d)`, 'i')))) {
+        cantidad = Number(m[1] || m[2] || m[3] || m[4]); quitarAqui(m);
     }
     // Los números que quedan, sin los que son medida del producto («30 cm», «2 kg»)
     const nums = [...l.matchAll(NUMERO)].filter((x) => !new RegExp(String.raw`^\s*${MEDIDA}`, 'i').test(l.slice(x.index + x[0].length)))
         .map((x) => ({ x, v: aNumero(x[1]) }));
     if (!nums.length) return null;
     let costo = null;
-    const usar = (n) => { l = quitar(l, n.x); };
+    const usar = (n) => quitarAqui(n.x);
     const ultimo = nums[nums.length - 1];
     // Factura: … cantidad · precio · importe. El importe es el control: con él se recupera un
     // punto decimal que la foto se comió («350» → 3.50) y una cantidad mal leída o perdida.
-    const alt = (n) => [n.v, ...(/^\d{3,}$/.test(n.x[1]) ? [n.v / 100] : [])];
-    const altImporte = (n) => alt(n).reverse();
+    // Fila de factura (valor unitario, precio, importe): ahí los precios llevan céntimos.
+    const filaDeFactura = nums.length >= 3;
+    const alt = (n) => {
+        const t = n.x[1], vs = [n.v];
+        if (/^\d{3,}$/.test(t)) vs[filaDeFactura ? 'unshift' : 'push'](n.v / 100); // «6200» → 62.00 (la foto se comió el punto)
+        if (/^1\d{2,}/.test(t) && t.length >= 4) { // «159.90» → 59.90 (la raya de la tabla leída como 1)
+            const sin = t.slice(1);
+            vs.push(aNumero(sin));
+            if (/^\d{3,}$/.test(sin)) vs.push(aNumero(sin) / 100);
+        }
+        return vs;
+    };
+    // En el importe se prueba primero la lectura corregida y al final el número tal cual.
+    const altImporte = (n) => { const a = alt(n); return [...a.filter((v) => v !== n.v), n.v]; };
     const tieneDecimal = (n) => /[.,]\d{2}$/.test(n.x[1]) || /^\d{3,}$/.test(n.x[1]);
     const penultimo = nums[nums.length - 2];
+    let cuadrado = false; // ¿cantidad × precio = importe?
     const intentar = () => {
         if (nums.length >= 2 && cantidad) {
             for (const pv of alt(penultimo)) for (const tv of alt(ultimo)) {
-                if (casi(cantidad * pv, tv)) { costo = pv; usar(penultimo); usar(ultimo); return; }
+                if (cuadra(cantidad, pv, tv)) { costo = pv; usar(penultimo); usar(ultimo); cuadrado = true; return; }
             }
         }
         if (nums.length >= 3 && !cantidad) {
             const a = nums[nums.length - 3], b = penultimo;
             for (const av of alt(a)) for (const bv of alt(b)) for (const tv of alt(ultimo)) {
-                if (!casi(av * bv, tv)) continue;
-                if (Number.isInteger(a.v) && av === a.v && a.x[1].length <= 4) { cantidad = av; costo = bv; usar(a); usar(b); usar(ultimo); return; }
-                if (Number.isInteger(b.v) && bv === b.v && b.x[1].length <= 4) { cantidad = bv; costo = av; usar(a); usar(b); usar(ultimo); return; }
+                if (Number.isInteger(a.v) && av === a.v && a.x[1].length <= 4 && cuadra(av, bv, tv)) { cantidad = av; costo = bv; usar(a); usar(b); usar(ultimo); cuadrado = true; return; }
+                if (Number.isInteger(b.v) && bv === b.v && b.x[1].length <= 4 && cuadra(bv, av, tv)) { cantidad = bv; costo = av; usar(a); usar(b); usar(ultimo); cuadrado = true; return; }
             }
         }
         // Solo precio e importe con decimales, y el importe es un múltiplo exacto: la cantidad sale de la cuenta.
         if (nums.length >= 2 && !cantidad && tieneDecimal(penultimo) && tieneDecimal(ultimo)) {
             for (const pv of alt(penultimo)) for (const tv of altImporte(ultimo)) {
                 const q = Math.round(tv / pv);
-                if (pv > 0 && q >= 2 && q <= 100000 && casi(q * pv, tv)) {
+                if (pv > 0 && q >= 2 && q <= 100000 && cuadra(q, pv, tv)) {
                     cantidad = q; costo = pv; usar(penultimo); usar(ultimo);
                     // Un entero al principio era la cantidad mal leída: fuera.
                     const primero = nums[0];
                     if (primero !== penultimo && Number.isInteger(primero.v) && !l.slice(0, primero.x.index).trim()) usar(primero);
+                    cuadrado = true;
                     return;
                 }
             }
         }
     };
     intentar();
+    // Parecía una fila de factura (cantidad y dos números, o tres números) y la cuenta no cuadró:
+    // la foto leyó mal algún número. Se toma el precio unitario (el de antes del importe), nunca
+    // el importe, y se marca para revisar.
+    let dudoso = false;
+    if (costo == null && ((cantidad && nums.length >= 2) || nums.length >= 3)) {
+        dudoso = true;
+        const pu = cantidad ? penultimo : nums[nums.length - 2];
+        costo = pu.v; usar(pu); usar(ultimo);
+    }
     if (costo == null) {
         costo = ultimo.v; usar(ultimo);
         // «24 Cono 30 cm 3.50»: el número del principio es la cantidad
         const primero = nums[0];
         if (!cantidad && nums.length >= 2 && Number.isInteger(primero.v) && !l.slice(0, primero.x.index).trim()) { cantidad = primero.v; usar(primero); }
     }
+    // Lo que queda de la fila de una factura no es nombre: el valor unitario sin IGV
+    // (precio ÷ 1.18) y el número de ítem del principio.
+    if (costo != null) {
+        for (const n of nums) if (l.slice(n.x.index, n.x.index + n.x[0].length).trim() && n.v > 0 && n.v !== costo && alt(n).some((v) => casi(v * 1.18, costo))) usar(n);
+        const primero = nums[0];
+        if (cantidad && primero && Number.isInteger(primero.v) && primero.v < 1000 && !l.slice(0, primero.x.index).trim()
+            && l.slice(primero.x.index, primero.x.index + primero.x[0].length).trim()) usar(primero);
+    }
     if (docenaEsPrecio) costo = Math.round((costo / 12) * 10000) / 10000;
+    // El nombre es lo de ANTES del primer dato (en una factura la descripción va antes de la
+    // unidad, la cantidad y los precios; lo de después es basura de la foto o de la tabla).
+    const primeraLetra = l.search(/\p{L}{2}/u);
+    const corte = Math.min(...marcas.filter((i) => primeraLetra >= 0 && i > primeraLetra));
+    if (Number.isFinite(corte)) l = l.slice(0, corte);
     const nombre = l.replace(/\s*[|¦]\s*/g, ' ').replace(/\s+/g, ' ').trim()
         .replace(/^[-–:·|,;*•.\s]+|[-–:·|,;=*•\s]+$/g, '')
         .replace(/\s+(?:a|de|en|al|x|por)$/i, '').replace(/^(?:a|de)\s+/i, '')
         .replace(/^(?:[a-z]\s+)?(?:\S{0,3}n[iíl1]?u|nius|zz|und|unid|kgm|mtr|lbr|pqt|paq|cja|caj|bol|bls|pk|bx)\b\.?\s*/i, '')
-        .replace(/^[^\p{L}\d]*\p{L}\s+(?=\p{L}{2})/u, '').trim();
+        .replace(/^[^\p{L}\d]*\p{L}\s+(?=\p{L}{2})/u, '')
+        // El código del proveedor al principio («AR-1E033-101») y la unidad suelta («… NIU»).
+        .replace(/^[a-zñ]\s+(?=\S)/, '') // una letra suelta de la foto («y 4 AR-…»)
+        .replace(/^(?:[^\p{L}\s]+\s+)*(?:\S*\d\S*\p{L}\S*|\S*\p{L}\S*\d\S*)\s+(?=\p{L}{3})/u, '')
+        .replace(/(?:\s+(?:[^\p{L}\d\s]+|\S*[)\]}]\S*|[\p{L}\d]))+$/u, '')
+        .replace(/\s+(?:niu|nius|zz|und|unid)\.?(?=\s|$)/gi, '').trim();
     // Un «nombre» sin letras (basura de la foto) no es un producto.
     if (nombre && !/\p{L}{2}/u.test(nombre)) return null;
     if (!(costo > 0)) return null;
-    return { nombre, costo, cantidad: cantidad > 0 ? cantidad : null, docena, flete };
+    const p = { nombre, costo, cantidad: cantidad > 0 ? cantidad : null, docena, flete };
+    if (dudoso) p.dudoso = true;
+    if (cuadrado) p.cuadrado = true;
+    return p;
 }
 
 /** Columnas de Excel con títulos: ¿dónde está cada cosa? */
@@ -264,14 +314,19 @@ function columnasDeTitulos(linea) {
  * Lo que de una factura NO es producto: encabezado, totales, pie. Al leer una foto o un
  * PDF entero salen; se saltan (y se cuentan) en vez de volverse «productos».
  */
-const NO_ES_PRODUCTO = /\b(?:r\.?\s*u\.?\s*c|dni|factura|boleta|electr[oó]nica|fecha|emisi[oó]n|vencimiento|sub\s*-?\s*total|total|igv|i\.g\.v|op\.?\s*(?:gravada|exonerada|inafecta)|gravad[ao]|exonerad[ao]|inafect[ao]|descuentos?|importe\s+total|son\s*:|soles\s+con|tel[eé]?f|tel[eé]fono|celular|cel\.|direcci[oó]n|domicilio|av\.|jr\.|calle|cliente|se[ñn]or(?:es)?|raz[oó]n\s+social|vendedor|gu[ií]a|moneda|forma\s+de\s+pago|condici[oó]n|cr[eé]dito|contado|cuotas?|p[aá]gina|www\.|https?|hash|resumen|representaci[oó]n|autorizad[oa]|consulte|serie|n[°º]\s*de\s*orden|orden\s+de\s+compra|cuenta|banco|bcp|interbank|bbva|yape|plin|detracci[oó]n|retenci[oó]n|percepci[oó]n|vuelto|efectivo|cambio|s\.?\s*a\.?\s*c\.?|e\.?\s*i\.?\s*r\.?\s*l\.?|s\.?\s*r\.?\s*l\.?|s\.?\s*a\.?\s*a\.?)(?=\W|$)|\b[FBE][A-Z0-9]{3}\s*-\s*\d{1,8}\b|@/i;
+const NO_ES_PRODUCTO = /\b(?:r\.?\s*u\.?\s*c|dni|factura|boleta|electr[oó]nica|fecha|emisi[oó]n|vencimiento|sub\s*-?\s*total|total|igv|i\.g\.v|op\.?\s*(?:gravada|exonerada|inafecta)|gravad[ao]|exonerad[ao]|inafect[ao]|descuentos?|importe\s+total|son\s*:|soles\s+con|tel[eé]?f|tel[eé]fono|celular|cel\.|direcci[oó]n|domicilio|av\.|jr\.|calle|cliente|se[ñn]or(?:es)?|raz[oó]n\s+social|vendedor|gu[ií]a|moneda|forma\s+de\s+pago|condici[oó]n|cr[eé]dito|contado|cuotas?|p[aá]gina|www\.|https?|hash|resumen|representaci[oó]n|autorizad[oa]|consulte|serie|n[°º]\s*de\s*orden|orden\s+de\s+compra|cuenta|banco|bcp|interbank|bbva|yape|plin|detracci[oó]n|retenci[oó]n|percepci[oó]n|vuelto|efectivo|cambio|\d{2}\s*%|s\.?\s*a\.?\s*c\.?|e\.?\s*i\.?\s*r\.?\s*l\.?|s\.?\s*r\.?\s*l\.?|s\.?\s*a\.?\s*a\.?)(?=\W|$)|\b[FBE][A-Z0-9]{3}\s*-\s*\d{1,8}\b|@/i;
 
 /** ¿La línea es solo números (una celda de una columna copiada sola)? */
 const soloNumero = (t) => /^\s*(?:S\s*\/\s*\.?\s*)?\d{1,3}(?:,\d{3})*(?:[.,]\d+)?\s*(?:und|unid|u|uds?|pzas?|nius|niu|doc|dz)?\.?\s*$/i.test(t) || /^\s*\d+(?:[.,]\d+)?\s*$/.test(t);
 const TITULO_COLUMNA = /^\s*(?:cant(?:idad)?\.?|c[oó]d(?:igo)?\.?|u\.?\s*m\.?|unidad(?:\s+de\s+medida)?|descripci[oó]n|producto|art[ií]culo|detalle|[ií]tem|p\.?\s*unit(?:ario)?\.?|precio(?:\s+unit(?:ario)?\.?)?|v\.?\s*unit(?:ario)?\.?|valor(?:\s+unit(?:ario)?\.?)?|importe|sub\s*total|total|n[°º]|#)\s*$/i;
 
 const PALABRA_TITULO = /^(?:cant(?:idad)?\.?|c[oó]d(?:igo)?\.?|u\.?m\.?|um|unidad|medida|de|descripci[oó]n|producto|art[ií]culo|detalle|[ií]tem|p\.?\s*unit(?:ario)?\.?|p\.|unit\.?|unitario|precio|v\.?\s*unit\.?|valor|venta|importe|sub\s*total|total|n[°º]|#|und\.?)$/i;
-const esTitulos = (t) => { const w = t.split(/[\s|¦]+/).filter(Boolean); return w.length >= 2 && w.every((x) => PALABRA_TITULO.test(x)); };
+const esTitulos = (t) => {
+    const w = t.split(/[\s|¦\]\[]+/).map((x) => x.replace(/^[^\p{L}\d#]+|[^\p{L}\d.#]+$/gu, '')).filter(Boolean);
+    const si = w.filter((x) => PALABRA_TITULO.test(x)).length;
+    // Todas, o (leída de una foto, con errores) al menos 4 y más de la mitad.
+    return w.length >= 2 && (si === w.length || (si >= 4 && si / w.length >= 0.5));
+};
 
 /**
  * Google Lens y «Texto en vivo» copian a veces una tabla POR COLUMNAS: primero todas las
@@ -336,7 +391,7 @@ function rearmarColumnas(lineas) {
  * → { productos: [{ nombre, costo, cantidad, docena, flete }], sinPrecio: [líneas sin precio],
  *     saltadas: [encabezado y totales de una factura] }
  */
-export function leerLista(texto) {
+export function leerLista(texto, { foto = false } = {}) {
     const productos = [], sinPrecio = [], saltadas = [];
     let lineas = String(texto || '').split(/\r?\n/).filter((x) => x.trim());
     const col = lineas.length && lineas[0].includes('\t') ? columnasDeTitulos(lineas[0]) : null;
@@ -358,6 +413,18 @@ export function leerLista(texto) {
         else if (TITULO_COLUMNA.test(linea) || esTitulos(linea) || (linea.match(/\p{L}/gu) || []).length < 4) saltadas.push(linea.trim());
         else sinPrecio.push(linea.trim());
     }
+    // Leído de una foto de factura (casi todo trae cantidad): lo que no trae cantidad ni un nombre de verdad
+    // (dos palabras de 3+ letras) es un renglón mal leído: se avisa, no se agrega.
+    const conCantidad = productos.filter((p) => p.cantidad).length;
+    if (foto && productos.length >= 3 && conCantidad / productos.length >= 0.6) {
+        for (let i = productos.length - 1; i >= 0; i--) {
+            const p = productos[i];
+            if (!p.cantidad && (p.nombre.match(/\p{L}{3,}/gu) || []).length < 2) { sinPrecio.push(p.nombre); productos.splice(i, 1); }
+            // En una foto, un precio que no se pudo comprobar con su importe se revisa.
+            else if (!p.cantidad || !p.cuadrado) p.dudoso = true;
+        }
+    }
+    for (const p of productos) delete p.cuadrado;
     return { productos, sinPrecio, saltadas };
 }
 

@@ -243,3 +243,33 @@ test('pegar: lo leído de una foto se corrige con el importe (punto perdido, can
     assert.deepEqual(sinPrecio, []);
 });
 
+
+test('factura de natación: código, unidad antes de la cantidad, valor sin IGV y precio con IGV', () => {
+    const t = ['ITEM CODIGO DESCRIPCION U.M. CANT. V.UNIT. P.UNIT. IMPORTE',
+        '1 AR-1E033-101 LENTES DE NATACION ARENA COBRA ULTRA SWIPE NIU 12 52.54 62.00 744.00',
+        '3 AR-005556-T28 JAMMER ARENA POWERSKIN ST 2.0 T-28 NIU 6 122.88 145.00 870.00', // la talla T-28 no es cantidad
+        '5 AR-91662-20 GORRO DE NATACION ARENA CLASSIC SILICONA NIU 36 15.68 18.50 666.00'].join('\n');
+    assert.deepEqual(leerPegado(t).map((p) => [p.nombre, p.cantidad, p.costo]), [
+        ['LENTES DE NATACION ARENA COBRA ULTRA SWIPE', 12, 62], // el precio CON IGV (lo que pagó)
+        ['JAMMER ARENA POWERSKIN ST 2.0 T-28', 6, 145],
+        ['GORRO DE NATACION ARENA CLASSIC SILICONA', 36, 18.5],
+    ]);
+});
+
+test('foto de factura: lo que no cuadra con el importe se marca para revisar, nunca entra callado', () => {
+    // Líneas tal como las leyó Tesseract de una foto de WhatsApp y de una foto torcida.
+    const t = ['> | 1|AR:1E033-101 LENTES DE NATACION ARENA COBRAULTRASWPE ÍNIU *— 12 5254! 6200 74400!', // puntos perdidos
+        '" y   4 | AR-002755-T30 — JAMMER ARENA TEAM SOLID T-30    NU   6 5076| 5990 35940',
+        '— 1 AR-16032-101 LENTES DE NATACION ARENA COBRA ULTRA SWIPE | NI   12 | sesa[ ezoo| -7e400)  |', // precios ilegibles
+        '— | 6/AR-91008-90 | GORRO DE NATACION ARENA POLY JR     [NU | 24 |   e31| ssl 232») —*',
+        '4 AR-002755-T30 JAMMER ARENA TEAM SOLID T-30   NIU   6   50.76 159.90   359.40 |', // la raya leída como «1»
+        'G.v. 18% SI 542.84'].join('\n');
+    const { productos } = leerLista(t, { foto: true });
+    const v = productos.map((p) => [p.nombre, p.cantidad, p.costo, Boolean(p.dudoso)]);
+    assert.deepEqual(v[0], ['LENTES DE NATACION ARENA COBRAULTRASWPE', 12, 62, false]);
+    assert.deepEqual(v[1], ['JAMMER ARENA TEAM SOLID T-30', 6, 59.9, false]);
+    assert.equal(v[2][3], true, 'ilegible: a revisar');
+    assert.equal(v[3][3], true, 'S/ 232 no cuadra con nada: a revisar');
+    assert.deepEqual(v[4], ['JAMMER ARENA TEAM SOLID T-30', 6, 59.9, false]);
+    assert.equal(productos.length, 5, 'la línea del IGV no es producto');
+});

@@ -95,8 +95,8 @@ function anguloDeLaHoja(oscuro, ancho, alto) {
  * La imagen lista para el OCR: tamaño de letra cómodo, derecha, en blanco y negro y sin las
  * rayas de la tabla (Tesseract se confunde con la cuadrícula y con el fondo gris de los títulos).
  */
-function prepararImagen(fuente, ancho, alto) {
-    const escala = Math.min(2.5, Math.max(1, 2200 / Math.max(ancho, 1)));
+function prepararImagen(fuente, ancho, alto, objetivo = 2200) {
+    const escala = Math.min(3, Math.max(1, objetivo / Math.max(ancho, 1)));
     let c = document.createElement('canvas');
     c.width = Math.round(ancho * escala);
     c.height = Math.round(alto * escala);
@@ -204,9 +204,10 @@ function filasDelPdf(items) {
 
 /**
  * → { texto, como: 'pdf' | 'ocr', paginas }
- * alProgreso(texto) recibe «Leyendo… 40 %».
+ * alProgreso(texto) recibe «Leyendo… 40 %». `objetivo`: ancho en píxeles al que se lleva la hoja
+ * (más ancho = letra más grande para el OCR, y más lento).
  */
-export async function leerArchivo(archivo, alProgreso = () => {}) {
+export async function leerArchivo(archivo, alProgreso = () => {}, { objetivo = 2200 } = {}) {
     const esPdf = archivo.type === 'application/pdf' || /\.pdf$/i.test(archivo.name);
     if (esPdf) {
         alProgreso('Abriendo el PDF…');
@@ -226,18 +227,18 @@ export async function leerArchivo(archivo, alProgreso = () => {}) {
             alProgreso(`Es una foto: preparando la página ${n}…`);
             const pagina = await doc.getPage(n);
             const vista = pagina.getViewport({ scale: 1 });
-            const escala = Math.min(3, 2200 / vista.width);
+            const escala = Math.min(3, objetivo / vista.width);
             const v = pagina.getViewport({ scale: escala });
             const lienzo = document.createElement('canvas');
             lienzo.width = Math.round(v.width); lienzo.height = Math.round(v.height);
             await pagina.render({ canvasContext: lienzo.getContext('2d'), viewport: v }).promise;
-            leidos.push(await ocr(prepararImagen(lienzo, lienzo.width, lienzo.height), n, paginas, alProgreso));
+            leidos.push(await ocr(prepararImagen(lienzo, lienzo.width, lienzo.height, objetivo), n, paginas, alProgreso));
         }
         return { texto: leidos.join('\n'), como: 'ocr', paginas };
     }
     alProgreso('Preparando la foto…');
     const bitmap = await createImageBitmap(archivo, { imageOrientation: 'from-image' });
-    const texto = await ocr(prepararImagen(bitmap, bitmap.width, bitmap.height), 1, 1, alProgreso);
+    const texto = await ocr(prepararImagen(bitmap, bitmap.width, bitmap.height, objetivo), 1, 1, alProgreso);
     bitmap.close?.();
     return { texto, como: 'ocr', paginas: 1 };
 }
