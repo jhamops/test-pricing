@@ -152,7 +152,7 @@ test('la hoja de Excel: una fila por producto, números como números, y los tot
     const marzo = new Date(2026, 2, 1);
     const productos = [
         { nombre: 'Scooter', costo: 85, cantidad: 2, flete: '4', pct: 45 },
-        { nombre: 'Cono', costo: 3, cantidad: 24, flete: '', pct: 50 },
+        { nombre: 'Cono', costo: 3, cantidad: 24, flete: '', pct: 50, docena: true },
         { nombre: 'Sin cantidad', costo: 10, cantidad: null, flete: '', pct: 40 },
     ];
     const { columnas, filas, totales } = filasExcel(productos, SIN_TARJETA, 26, marzo);
@@ -170,4 +170,11 @@ test('la hoja de Excel: una fila por producto, números como números, y los tot
     assert.ok(totales && totales.invertido === 88 * 2 + 4 * 24, JSON.stringify(totales));
     // Sin ninguna cantidad no hay totales que mostrar.
     assert.equal(filasExcel([productos[2]], SIN_TARJETA).totales, null);
+});
+
+test('por docena solo si ella lo marca en ese producto', () => {
+    assert.equal(calcular({ costo: 3, pct: 50, docena: false }, R).porDocena, false);
+    assert.equal(calcular({ costo: 3, pct: 50, docena: false }, R).docena, null);
+    assert.equal(calcular({ costo: 40, pct: 50, docena: true }, R).porDocena, true); // también lo caro, si lo vende por mayor
+    assert.equal(calcular({ costo: 40, pct: 50, docena: true }, R).docena, Math.round(calcular({ costo: 40, pct: 50, docena: true }, R).docenaUnidad * 12 * 100) / 100);
 });

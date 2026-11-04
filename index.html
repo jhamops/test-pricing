@@ -57,6 +57,7 @@
                     <div class="chips" id="nuevo-pct"></div>
                 </div>
                 <div class="fila-final">
+                    <button type="button" class="interr" id="nuevo-docena" aria-pressed="false">Por docena</button>
                     <label class="cant-chica">Cantidad <small>(opcional)</small>
                         <input id="nuevo-cant" inputmode="numeric" placeholder="—" enterkeyhint="done">
                     </label>
@@ -89,7 +90,7 @@
             <table class="tabla">
                 <thead><tr>
                     <th>Producto</th><th class="num">Compra</th><th class="num">Cant.</th><th class="num">Flete</th>
-                    <th class="num">Ganancia</th><th class="num">Precio</th><th class="num">Ganas c/u</th><th>Clave</th><th><span class="oculto">Quitar</span></th>
+                    <th class="num">Ganancia</th><th>Docena</th><th class="num">Precio</th><th class="num">Ganas c/u</th><th>Clave</th><th><span class="oculto">Quitar</span></th>
                 </tr></thead>
                 <tbody id="lista"></tbody>
             </table>
@@ -116,12 +117,9 @@
             <div class="dialogo-cuerpo">
                 
 
-                <h3><span class="paso">1</span> Docena y suelto</h3>
-                <label class="interruptor"><input type="checkbox" id="regla-docena-on"> Saco precio <b>por docena</b> (además del suelto)</label>
-                <div class="linea-regla" id="linea-docena">
-                    <span>Lo que te cuesta menos de</span>
-                    <span class="con-sol mini"><span aria-hidden="true">S/</span><input id="regla-docena" inputmode="decimal" aria-label="Se vende por docena si cuesta menos de"></span>
-                    <span>se vende <b>por docena</b>; el <b>suelto</b> cuesta</span>
+                <h3><span class="paso">1</span> Por docena</h3>
+                <div class="linea-regla">
+                    <span>Cuando marcas <b>por docena</b>, el <b>suelto</b> cuesta</span>
                     <span class="con-sol mini"><input id="regla-suelto" inputmode="decimal" aria-label="El suelto, cuánto más"><span aria-hidden="true">%</span></span>
                     <span>más.</span>
                 </div>

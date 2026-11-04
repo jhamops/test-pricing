@@ -53,7 +53,7 @@ $('tema').addEventListener('click', () => {
 
 // ── La cuenta ──────────────────────────────────────────────────────────────
 const fleteDe = (p) => fleteDeCalc(p, estado.productos, num(estado.flete));
-const resultado = (p) => calcular({ costo: p.costo, pct: p.pct, flete: fleteDe(p) }, estado.regla);
+const resultado = (p) => calcular({ costo: p.costo, pct: p.pct, docena: Boolean(p.docena), flete: fleteDe(p) }, estado.regla);
 const conTarjeta = () => estado.regla.tarjetaSiempre !== false && Number(estado.regla.tarjeta) > 0;
 
 // ── Aviso con «Deshacer» ───────────────────────────────────────────────────
@@ -69,6 +69,7 @@ function avisar(texto, deshacer = null) {
 
 // ── Arriba: precio de compra, tarjeta, flete y ganancia ────────────────────
 let pctNuevo = estado.ultimoPct;
+let docenaNueva = false; // ¿lo vende por docena (por mayor)? Lo marca ella.
 
 function htmlPorcentajes(actual) {
     const esOtro = !PORCENTAJES.includes(Number(actual));
@@ -86,7 +87,7 @@ function vistaPrevia() {
     const costo = num($('nuevo-costo').value);
     const caja = $('vista-previa');
     if (!(costo > 0)) { caja.innerHTML = ''; caja.classList.remove('lleno'); return; }
-    const r = calcular({ costo, pct: pctNuevo, flete: fleteDelProducto($('nuevo-flete').value.replace(',', '.'), num($('nuevo-cant').value)) }, estado.regla);
+    const r = calcular({ costo, pct: pctNuevo, docena: docenaNueva, flete: fleteDelProducto($('nuevo-flete').value.replace(',', '.'), num($('nuevo-cant').value)) }, estado.regla);
     const redondeado = !r.porDocena && Math.abs(r.sinRedondear - r.suelto) >= 0.5;
     caja.classList.add('lleno');
     caja.innerHTML = r.porDocena
@@ -94,6 +95,11 @@ function vistaPrevia() {
         : `<span class="grande"><b>${soles(r.suelto)}</b></span>${redondeado ? `<span class="antes-red">antes ${soles(r.sinRedondear)}</span>` : ''}<span class="gana-mini">ganas ${soles(r.ganasSuelto)}</span>`;
 }
 ['nuevo-costo', 'nuevo-cant', 'nuevo-flete'].forEach((id) => $(id).addEventListener('input', vistaPrevia));
+$('nuevo-docena').addEventListener('click', () => {
+    docenaNueva = !docenaNueva;
+    $('nuevo-docena').setAttribute('aria-pressed', String(docenaNueva));
+    vistaPrevia();
+});
 $('nuevo-pct').innerHTML = htmlPorcentajes(pctNuevo);
 $('nuevo-pct').addEventListener('click', (e) => {
     const b = e.target.closest('[data-pct]');
@@ -123,7 +129,7 @@ $('form-nuevo').addEventListener('submit', (e) => {
     const costo = num($('nuevo-costo').value);
     if (!(costo > 0)) { $('nuevo-costo').focus(); avisar('Falta el precio de compra.'); return; }
     estado.ultimoPct = pctNuevo;
-    agregar([{ nombre: $('nuevo-nombre').value.trim(), costo, cantidad: num($('nuevo-cant').value) || null, flete: $('nuevo-flete').value.trim(), pct: pctNuevo }]);
+    agregar([{ nombre: $('nuevo-nombre').value.trim(), costo, cantidad: num($('nuevo-cant').value) || null, flete: $('nuevo-flete').value.trim(), pct: pctNuevo, docena: docenaNueva }]);
     ['nuevo-nombre', 'nuevo-costo', 'nuevo-cant', 'nuevo-flete'].forEach((id) => { $(id).value = ''; });
     vistaPrevia();
     $('nuevo-nombre').focus();
@@ -132,7 +138,7 @@ $('form-nuevo').addEventListener('submit', (e) => {
 function agregar(lista) {
     const nuevos = lista.map((x, i) => ({
         id: siguienteId++, nombre: x.nombre || `Producto ${estado.productos.length + i + 1}`,
-        costo: x.costo, cantidad: x.cantidad, pct: x.pct ?? estado.ultimoPct, flete: x.flete || '',
+        costo: x.costo, cantidad: x.cantidad, pct: x.pct ?? estado.ultimoPct, flete: x.flete || '', docena: Boolean(x.docena),
     }));
     estado.productos = [...nuevos.reverse(), ...estado.productos]; // lo último, arriba
     guardar();
@@ -167,6 +173,7 @@ function htmlFila(p, nuevo) {
                 <button type="button" data-accion="mas" aria-label="5 más">+</button>
             </span>
         </td>
+        <td data-label="Docena"><button type="button" class="interr chico" data-accion="docena" aria-pressed="${Boolean(p.docena)}" aria-label="Por docena">x12</button></td>
         <td data-label="Precio" class="num calc" data-c="precio">${c.precio}</td>
         <td data-label="Ganas c/u" class="num calc" data-c="ganas">${c.ganas}</td>
         <td data-label="Clave" class="calc" data-c="clave">${c.clave}</td>
@@ -261,6 +268,11 @@ $('lista').addEventListener('click', async (e) => {
         p.pct = Math.max(0, accion === 'mas' ? Math.floor(base / 5) * 5 + 5 : Math.ceil(base / 5) * 5 - 5);
         estado.ultimoPct = p.pct;
         tr.querySelector('[data-campo="pct"]').value = p.pct;
+        guardar(); repintarFila(tr, p); pintarResumen();
+    }
+    if (accion === 'docena') {
+        p.docena = !p.docena;
+        b.setAttribute('aria-pressed', String(p.docena));
         guardar(); repintarFila(tr, p); pintarResumen();
     }
     if (accion === 'quitar') {
@@ -373,19 +385,14 @@ dPegar.addEventListener('close', () => {
 const dRegla = $('dialogo-regla');
 function pintarEjemplos() {
     const R = estado.regla;
-    const barato = calcular({ costo: 3, pct: 50 }, R);
-    $('ej-docena').innerHTML = barato.porDocena
-        ? `Ej.: costó ${soles(3)}, +50 % → docena ${soles(barato.docenaUnidad)} c/u, suelto ${soles(barato.suelto)}.`
-        : 'Todo con un solo precio.';
+    const barato = calcular({ costo: 3, pct: 50, docena: true }, R);
+    $('ej-docena').innerHTML = `Ej.: costó ${soles(3)}, +50 % → docena ${soles(barato.docenaUnidad)} c/u, suelto ${soles(barato.suelto)}.`;
     $('ej-redondeo').innerHTML = `Ej.: ${soles(4.36)} → <b>${soles(redondearPrecio(4.36, R))}</b> · ${soles(64.7)} → <b>${soles(redondearPrecio(64.7, R))}</b> · ${soles(203.85)} → <b>${soles(redondearPrecio(203.85, R))}</b>`;
 }
 function pintarRegla() {
     const R = estado.regla;
     pintarEjemplos();
-    $('regla-docena').value = R.docenaHasta;
-    $('regla-docena-on').checked = R.porDocenaOn !== false;
     $('regla-8-on').checked = R.terminaEn8On !== false;
-    $('linea-docena').hidden = R.porDocenaOn === false;
     $('regla-suelto').value = R.recargoSuelto;
     $('regla-al-sol').value = R.redondeoAlSolDesde;
     $('regla-en-8').value = R.terminaEn8Desde;
@@ -396,9 +403,7 @@ function pintarRegla() {
 $('abrir-regla').addEventListener('click', () => { pintarRegla(); dRegla.showModal(); });
 dRegla.addEventListener('input', (e) => {
     const t = e.target, R = estado.regla;
-    if (t.id === 'regla-docena') R.docenaHasta = num(t.value);
-    else if (t.id === 'regla-docena-on') { R.porDocenaOn = t.checked; $('linea-docena').hidden = !t.checked; }
-    else if (t.id === 'regla-8-on') R.terminaEn8On = t.checked;
+    if (t.id === 'regla-8-on') R.terminaEn8On = t.checked;
     else if (t.id === 'regla-suelto') R.recargoSuelto = num(t.value);
     else if (t.id === 'regla-al-sol') R.redondeoAlSolDesde = num(t.value);
     else if (t.id === 'regla-en-8') R.terminaEn8Desde = num(t.value) || 1e9;

@@ -78,7 +78,7 @@ export function porcentajeDe(costo, regla, ajuste = 'normal') {
  * Todo lo de un producto. `costo` es por unidad (con IGV si compró con factura);
  * `flete` es lo que le toca de flete a cada unidad.
  */
-export function calcular({ costo, flete = 0, ajuste = 'normal', pct: elegido = null }, regla) {
+export function calcular({ costo, flete = 0, ajuste = 'normal', pct: elegido = null, docena = null }, regla) {
     const c = Number(costo);
     if (!(c > 0)) return null;
     const f = Number(flete) || 0;
@@ -91,7 +91,8 @@ export function calcular({ costo, flete = 0, ajuste = 'normal', pct: elegido = n
     // cuaderno: 100 + 30 % + 2 de flete = 132); y encima lo que se lleva la tarjeta
     // (dividiendo, no sumando: la comisión se cobra sobre el precio final).
     const conPct = (c * (1 + pct / 100) + f) / (1 - t);
-    const porDocena = regla.porDocenaOn !== false && c < regla.docenaHasta;
+    // Por docena (por mayor) lo decide ella en cada producto; sin decirlo, la regla vieja por costo.
+    const porDocena = docena != null ? Boolean(docena) : regla.porDocenaOn !== false && c < regla.docenaHasta;
     let docenaUnidad = null, suelto;
     if (porDocena) {
         docenaUnidad = redondear(conPct, 0.1);
@@ -197,7 +198,7 @@ export function filasExcel(productos, regla, fleteGlobal = 0, fecha = new Date()
     const filas = [];
     let invertido = 0, ganas = 0, queda = 0, conCantidad = 0;
     for (const p of productos) {
-        const r = calcular({ costo: p.costo, pct: p.pct, flete: fleteDe(p, productos, fleteGlobal) }, regla);
+        const r = calcular({ costo: p.costo, pct: p.pct, docena: Boolean(p.docena), flete: fleteDe(p, productos, fleteGlobal) }, regla);
         if (!r) continue;
         const n = Number(p.cantidad) > 0 ? Number(p.cantidad) : null;
         const ganaUnidad = r.porDocena ? r.ganas : r.ganasSuelto;

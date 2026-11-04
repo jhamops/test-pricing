@@ -12,7 +12,8 @@ cuánto te queda después del IGV y la **clave del cuaderno** (`mes costo año %
   soles con formato, y los totales. La librería (`vendor/xlsx.full.min.js`, SheetJS 0.18.5) se
   carga solo al tocar el botón.
 - La tarjeta (3 %) va siempre dentro del precio (se divide entre 0.97); el flete se suma sin ganancia.
-- Lo barato sale por docena y suelto, y lo caro termina en 8 (las dos cosas, opcionales en ⚙).
+- **Por docena solo si ella lo marca** («Por docena» al llenar, «x12» en cada fila): sale la docena
+  c/u y el suelto. Si no, un solo precio. Lo caro termina en 8 (opcional en ⚙).
 - Se guarda solo en el equipo (misma dirección = mismos datos, aunque se actualice la página).
 
 ## Archivos
