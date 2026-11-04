@@ -8,7 +8,7 @@
  */
 import {
     PORCENTAJES, REGLA_INICIAL, calcular, clave, filasExcel, fleteDe as fleteDeCalc, fleteDelProducto, fletePorUnidad,
-    leerPegado, redondearPrecio, textoParaCopiar,
+    leerLista, redondearPrecio, textoParaCopiar,
 } from './precios.js';
 
 const GUARDADO = 'illak-calculadora-v3';
@@ -365,20 +365,65 @@ $('vaciar').addEventListener('click', () => {
 });
 
 // ── Pegar varios ───────────────────────────────────────────────────────────
+// Lo pegado se lee en vivo y se ve con su precio antes de agregarlo; lo que no se entendió
+// se dice (no se pierde callado). La «x12» de cada fila se recuerda por línea.
 const dPegar = $('dialogo-pegar');
-$('abrir-pegar').addEventListener('click', () => { $('pegado').value = ''; vistaPegado(); dPegar.showModal(); $('pegado').focus(); });
+let pctPegar = pctNuevo;
+const docenaPegada = new Map(); // línea → ¿por docena? (lo que ella tocó en la vista)
+const leido = () => {
+    const { productos, sinPrecio } = leerLista($('pegado').value);
+    return { sinPrecio, productos: productos.map((x, i) => ({ ...x, i, docena: docenaPegada.has(`${i}|${x.nombre}`) ? docenaPegada.get(`${i}|${x.nombre}`) : x.docena, pct: pctPegar })) };
+};
+$('abrir-pegar').addEventListener('click', () => {
+    $('pegado').value = ''; docenaPegada.clear(); pctPegar = pctNuevo;
+    $('pegar-pct').innerHTML = htmlPorcentajes(pctPegar);
+    vistaPegado(); dPegar.showModal(); $('pegado').focus();
+});
 function vistaPegado() {
-    const l = leerPegado($('pegado').value);
-    $('vista-pegado').textContent = $('pegado').value.trim()
-        ? (l.length ? `${l.length} ${l.length === 1 ? 'producto' : 'productos'}: ${l.slice(0, 3).map((x) => `${x.nombre} (${soles(x.costo)})`).join(', ')}${l.length > 3 ? '…' : ''}` : 'No encontré ningún precio.')
-        : '';
-    $('pegar-agregar').disabled = !l.length;
+    const { productos, sinPrecio } = leido();
+    const esOtro = !PORCENTAJES.includes(Number(pctPegar));
+    $('pegar-pct').querySelectorAll('[data-pct]').forEach((b) => b.setAttribute('aria-pressed', String(!esOtro && Number(b.dataset.pct) === Number(pctPegar))));
+    $('pegar-pct').querySelector('.pct-otro').classList.toggle('activo', esOtro);
+    const filas = productos.map((x) => {
+        const r = calcular({ costo: x.costo, pct: x.pct, docena: x.docena, flete: fleteDelProducto(x.flete, x.cantidad) }, estado.regla);
+        const detalle = [`compra ${soles(x.costo)}`, x.cantidad ? `${x.cantidad} und` : '', x.flete ? `flete ${soles(x.flete)}` : ''].filter(Boolean).join(' · ');
+        const precio = r.porDocena ? `${soles(r.docenaUnidad)}<small>docena · suelto ${soles(r.suelto)}</small>` : soles(r.suelto);
+        return `<li><span class="pg-nombre"><b>${esc(x.nombre)}</b><small>${detalle}</small></span>
+            <button type="button" class="interr chico" data-pg-docena="${x.i}|${esc(x.nombre)}" aria-pressed="${x.docena}" aria-label="Por docena">x12</button>
+            <span class="pg-precio">${precio}</span></li>`;
+    }).join('');
+    const malas = sinPrecio.length
+        ? `<p class="pg-malas"><b>Sin precio, no ${sinPrecio.length === 1 ? 'entra' : 'entran'}:</b> ${sinPrecio.slice(0, 4).map((t) => `«${esc(t)}»`).join(', ')}${sinPrecio.length > 4 ? ` y ${sinPrecio.length - 4} más` : ''}</p>` : '';
+    $('vista-pegado').innerHTML = (filas ? `<ul class="pg-lista">${filas}</ul>` : '') + malas;
+    $('pegar-agregar').disabled = !productos.length;
+    $('pegar-agregar').textContent = productos.length ? `Agregar ${productos.length}` : 'Agregar';
 }
 $('pegado').addEventListener('input', vistaPegado);
+$('pegar-pct').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-pct]');
+    if (!b) return;
+    pctPegar = Number(b.dataset.pct);
+    $('pegar-pct').querySelector('[data-pct-otro]').value = '';
+    vistaPegado();
+});
+$('pegar-pct').addEventListener('input', (e) => {
+    if (!e.target.matches('[data-pct-otro]') || e.target.value.trim() === '') return;
+    pctPegar = num(e.target.value);
+    vistaPegado();
+});
+$('vista-pegado').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-pg-docena]');
+    if (!b) return;
+    docenaPegada.set(b.dataset.pgDocena, b.getAttribute('aria-pressed') !== 'true');
+    vistaPegado();
+});
 dPegar.addEventListener('close', () => {
     if (dPegar.returnValue !== 'agregar') return;
-    const l = leerPegado($('pegado').value);
-    if (l.length) { agregar(l.map((x) => ({ ...x, pct: pctNuevo }))); avisar(`Agregaste ${l.length}.`); }
+    const { productos } = leido();
+    if (!productos.length) return;
+    estado.ultimoPct = pctPegar;
+    agregar(productos.map(({ i, ...x }) => x).reverse()); // en la lista quedan en el orden de su papel
+    avisar(`Agregaste ${productos.length}.`);
 });
 
 // ── Tu regla ───────────────────────────────────────────────────────────────

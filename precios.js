@@ -142,30 +142,113 @@ export function fletePorUnidad(fleteTotal, productos) {
 }
 
 /**
- * Varios productos pegados (de una lista, una factura copiada, un WhatsApp). Una línea
- * por producto: el último número es el costo; «x 36» o «36 und» es la cantidad.
+ * Varios productos de una vez: escritos, dictados, copiados de un WhatsApp, de una
+ * factura o de columnas de Excel. Una línea por producto.
+ *
+ * - El precio de compra es el último número (lo que va pegado a «cm», «kg», «ml»… es parte del nombre).
+ * - Cantidad: «x 24», «24 und», «por 24», o el número al empezar la línea («24 Cono 3.50»).
+ * - Si la línea trae el total (factura: cantidad · precio · total), el total se descarta.
+ * - «doc» o «docena» al final marca que lo vende por docena; «42 la docena» es el precio
+ *   de la docena (se divide entre 12).
+ * - «flete 5» es el flete de ese producto.
+ * - Columnas de Excel con títulos (Producto · Cantidad · Costo) se leen por su título.
  */
-export function leerPegado(texto) {
-    const salida = [];
-    for (const cruda of String(texto || '').split(/\r?\n/)) {
-        let linea = cruda.replace(/\t/g, ' ').trim();
-        if (!linea) continue;
-        let cantidad = null;
-        const cant = linea.match(/(?:\bx\s*(\d+)\b|\b(\d+)\s*(?:und|unid|unidades|u|pzas?|piezas?)\b\.?)/i);
-        if (cant) {
-            cantidad = Number(cant[1] || cant[2]);
-            linea = (linea.slice(0, cant.index) + ' ' + linea.slice(cant.index + cant[0].length)).trim();
-        }
-        const numeros = [...linea.matchAll(/(?:s\/\.?\s*)?(\d+(?:[.,]\d{1,2})?)/gi)];
-        if (!numeros.length) continue;
-        const ultimo = numeros[numeros.length - 1];
-        const costo = Number(ultimo[1].replace(',', '.'));
-        const nombre = linea.slice(0, ultimo.index).replace(/[-–:·|]+\s*$/, '').replace(/s\/\.?\s*$/i, '').trim();
-        if (!(costo > 0)) continue;
-        salida.push({ nombre: nombre || `Producto ${salida.length + 1}`, costo, cantidad });
-    }
-    return salida;
+const MEDIDA = String.raw`(?:cm|mm|mts?|m|metros?|cent[ií]metros?|kg|kilos?|gr?s?|gramos?|ml|lts?|l|litros?|oz|pulg(?:adas)?|w|v|mah|gb|p)\b`;
+const UNIDADES = String.raw`(?:und|unds|unid|unidades|uds?|u|pzas?|piezas?|pqtes?|paquetes?)\b\.?`;
+const NUMERO = /(?<![\w.,°/#-])(\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:[.,]\d+)?)(?![\w°%]|[.,]\d)/g;
+const aNumero = (t) => Number(/^\d{1,3}(,\d{3})+(\.\d+)?$/.test(t) ? t.replace(/,/g, '') : t.replace(',', '.'));
+const casi = (a, b) => Math.abs(a - b) <= Math.max(0.05, b * 0.01);
+
+function quitar(linea, m) {
+    return linea.slice(0, m.index) + ' '.repeat(m[0].length) + linea.slice(m.index + m[0].length);
 }
+
+function leerLinea(cruda) {
+    let l = ` ${cruda.replace(/\t/g, '  ')} `;
+    // Lo dictado: «3 soles 50» → 3.50; «a 3 soles» → 3.
+    l = l.replace(/(\d+)\s*soles?\s*(?:con\s*)?(\d{1,2})\b(?!\s*c[eé]ntimos?\s*\d)/gi, (_, s, c) => `${s}.${c.padStart(2, '0')}`)
+        .replace(/(\d+)\s*soles?\b/gi, '$1')
+        .replace(/(\d+)\s*c[eé]ntimos?\b/gi, (_, c) => `0.${c.padStart(2, '0')}`)
+        .replace(/\bS\s*\/\s*\.?/gi, '  ').replace(/\bc\s*\/\s*u\b\.?/gi, '   ').replace(/\bPEN\b/g, '   ');
+
+    let cantidad = null, docena = false, flete = '', docenaEsPrecio = false, m;
+    // flete 5
+    if ((m = l.match(/\bflete\s*:?\s*(\d+(?:[.,]\d+)?)/i))) { flete = String(aNumero(m[1])); l = quitar(l, m); }
+    // «42 la docena», «docena a 42», «x docena 42» → el precio es de la docena
+    if ((m = l.match(/(\d+(?:[.,]\d+)?)\s*(?:la|x|por|el)\s*(?:docena|doc|dz)\b\.?/i))) {
+        docena = true; docenaEsPrecio = true; l = quitar(l, { index: m.index + m[1].length, 0: m[0].slice(m[1].length) });
+    } else if ((m = l.match(/\b(?:la\s*)?(?:docena|doc|dz)\b\.?\s*(?:a|en|:)?\s*(?=\d)/i))) {
+        docena = true; docenaEsPrecio = true; l = quitar(l, m);
+    } else if ((m = l.match(/\b(?:x\s*|por\s*)?(?:docena|doc|dz)\b\.?/i))) { docena = true; l = quitar(l, m); }
+    // cantidad: «x 24», «24 und», «por 24»
+    if ((m = l.match(new RegExp(String.raw`\bx\s*(\d+)\b(?![.,]\d)|(?<![\w.,])(\d+)\s*${UNIDADES}|\bpor\s+(\d+)\b(?![.,]\d)(?!\s*${MEDIDA})`, 'i')))) {
+        cantidad = Number(m[1] || m[2] || m[3]); l = quitar(l, m);
+    }
+    // Los números que quedan, sin los que son medida del producto («30 cm», «2 kg»)
+    const nums = [...l.matchAll(NUMERO)].filter((x) => !new RegExp(String.raw`^\s*${MEDIDA}`, 'i').test(l.slice(x.index + x[0].length)))
+        .map((x) => ({ x, v: aNumero(x[1]) }));
+    if (!nums.length) return null;
+    let costo = null;
+    const usar = (n) => { l = quitar(l, n.x); };
+    const ultimo = nums[nums.length - 1];
+    // Factura: … cantidad precio total
+    if (nums.length >= 2 && cantidad && casi(cantidad * nums[nums.length - 2].v, ultimo.v)) {
+        costo = nums[nums.length - 2].v; usar(nums[nums.length - 2]); usar(ultimo);
+    } else if (nums.length >= 3 && !cantidad) {
+        const [a, b] = [nums[nums.length - 3], nums[nums.length - 2]];
+        if (casi(a.v * b.v, ultimo.v) && (Number.isInteger(a.v) || Number.isInteger(b.v))) {
+            const [q, p] = Number.isInteger(a.v) && (!Number.isInteger(b.v) || a.x.index < b.x.index) ? [a, b] : [b, a];
+            cantidad = q.v; costo = p.v; usar(a); usar(b); usar(ultimo);
+        }
+    }
+    if (costo == null) {
+        costo = ultimo.v; usar(ultimo);
+        // «24 Cono 30 cm 3.50»: el número del principio es la cantidad
+        const primero = nums[0];
+        if (!cantidad && nums.length >= 2 && Number.isInteger(primero.v) && !l.slice(0, primero.x.index).trim()) { cantidad = primero.v; usar(primero); }
+    }
+    if (docenaEsPrecio) costo = Math.round((costo / 12) * 10000) / 10000;
+    const nombre = l.replace(/\s+/g, ' ').trim()
+        .replace(/^[-–:·|,;*•.\s]+|[-–:·|,;=*•\s]+$/g, '')
+        .replace(/\s+(?:a|de|en|al|x|por)$/i, '').replace(/^(?:a|de)\s+/i, '').trim();
+    if (!(costo > 0)) return null;
+    return { nombre, costo, cantidad: cantidad > 0 ? cantidad : null, docena, flete };
+}
+
+/** Columnas de Excel con títulos: ¿dónde está cada cosa? */
+function columnasDeTitulos(linea) {
+    const celdas = linea.split('\t').map((c) => c.trim().toLowerCase());
+    if (celdas.length < 2 || celdas.some((c) => /\d/.test(c))) return null;
+    const busca = (re) => celdas.findIndex((c) => re.test(c));
+    const col = {
+        nombre: busca(/producto|descrip|nombre|art[ií]culo|detalle|item/),
+        costo: busca(/costo|compra|p\.?\s*unit|precio|valor\s*unit/),
+        cantidad: busca(/cant|unidades|und/),
+        flete: busca(/flete/),
+    };
+    return col.costo >= 0 && col.nombre >= 0 ? col : null;
+}
+
+/** → { productos: [{ nombre, costo, cantidad, docena, flete }], sinPrecio: [líneas que no se entendieron] } */
+export function leerLista(texto) {
+    const productos = [], sinPrecio = [];
+    const lineas = String(texto || '').split(/\r?\n/).filter((x) => x.trim());
+    const col = lineas.length && lineas[0].includes('\t') ? columnasDeTitulos(lineas[0]) : null;
+    for (const linea of col ? lineas.slice(1) : lineas) {
+        let p = null;
+        if (col) {
+            const c = linea.split('\t');
+            const n = (i) => (i >= 0 && c[i] != null ? aNumero(String(c[i]).replace(/S\s*\/\s*\.?|\s/gi, '')) : NaN);
+            const costo = n(col.costo);
+            if (costo > 0) p = { nombre: String(c[col.nombre] || '').trim(), costo, cantidad: n(col.cantidad) > 0 ? n(col.cantidad) : null, docena: false, flete: n(col.flete) > 0 ? String(n(col.flete)) : '' };
+        } else p = leerLinea(linea);
+        if (p) productos.push({ ...p, nombre: p.nombre || `Producto ${productos.length + 1}` });
+        else sinPrecio.push(linea.trim());
+    }
+    return { productos, sinPrecio };
+}
+
+export const leerPegado = (texto) => leerLista(texto).productos;
 
 /** El texto para copiar (WhatsApp, cuaderno). */
 export function textoParaCopiar(filas, fecha = new Date()) {

@@ -1,7 +1,7 @@
 // node --test   (sin dependencias)
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { PORCENTAJES, REGLA_INICIAL as R, calcular, clave, escalonDe, fleteDelProducto, fletePorUnidad, leerPegado, porcentajeDe, redondearPrecio, terminadoEn8, textoParaCopiar } from './precios.js';
+import { PORCENTAJES, REGLA_INICIAL as R, calcular, clave, escalonDe, fleteDelProducto, fletePorUnidad, leerLista, leerPegado, porcentajeDe, redondearPrecio, terminadoEn8, textoParaCopiar } from './precios.js';
 const SIN_TARJETA = { ...R, tarjetaSiempre: false };
 import { DOCENA, SUELTO } from './precios-reales.js';
 
@@ -100,12 +100,34 @@ test('la clave del cuaderno', () => {
 
 test('pegar varios productos de una vez', () => {
     const l = leerPegado('Valla fija 20 cm 10 x 12\nAro 20cm 1.20 x 36\n\nUla 65 cm  S/ 9,50  24u\nsin precio\nEscalera 6P - 18');
+    const sin = { docena: false, flete: '' };
     assert.deepEqual(l, [
-        { nombre: 'Valla fija 20 cm', costo: 10, cantidad: 12 },
-        { nombre: 'Aro 20cm', costo: 1.2, cantidad: 36 },
-        { nombre: 'Ula 65 cm', costo: 9.5, cantidad: 24 },
-        { nombre: 'Escalera 6P', costo: 18, cantidad: null },
+        { nombre: 'Valla fija 20 cm', costo: 10, cantidad: 12, ...sin },
+        { nombre: 'Aro 20cm', costo: 1.2, cantidad: 36, ...sin },
+        { nombre: 'Ula 65 cm', costo: 9.5, cantidad: 24, ...sin },
+        { nombre: 'Escalera 6P', costo: 18, cantidad: null, ...sin },
     ]);
+});
+
+test('pegar: los ejemplos de la ventana dicen la verdad', () => {
+    const [cono, pelota, silbato, factura] = leerPegado('Cono 30 cm 3.50\nPelota de vóley 18 x 6\nSilbato 28.80 la docena\n24 Cono 3.50 84.00');
+    assert.deepEqual([cono.nombre, cono.costo, cono.cantidad], ['Cono 30 cm', 3.5, null]); // el 30 cm es del nombre
+    assert.deepEqual([pelota.costo, pelota.cantidad], [18, 6]);
+    assert.deepEqual([silbato.costo, silbato.docena], [2.4, true]); // 28.80 / 12
+    assert.deepEqual([factura.nombre, factura.costo, factura.cantidad], ['Cono', 3.5, 24]); // el total se descarta
+});
+
+test('pegar: factura, Excel, dictado, flete y lo que no se entiende', () => {
+    const f = leerPegado('24 UND CONO 30CM 3.50 84.00')[0];
+    assert.deepEqual([f.costo, f.cantidad], [3.5, 24]);
+    const d = leerPegado('Cono de 30 centímetros a 3 soles 50 por 24')[0];
+    assert.deepEqual([d.nombre, d.costo, d.cantidad], ['Cono de 30 centímetros', 3.5, 24]);
+    assert.equal(leerPegado('Mancuerna 2 kg 22 x 4 flete 8')[0].flete, '8');
+    assert.equal(leerPegado('Silbato 2.40 doc')[0].docena, true);
+    assert.equal(leerPegado('Guitarra 1,200.00')[0].costo, 1200);
+    const excel = leerLista('Producto\tCantidad\tCosto\nCono 30 cm\t24\t3.50\nAro\t36\tS/ 1.20\nTotal\t\t');
+    assert.deepEqual(excel.productos.map((p) => [p.nombre, p.cantidad, p.costo]), [['Cono 30 cm', 24, 3.5], ['Aro', 36, 1.2]]);
+    assert.deepEqual(excel.sinPrecio, ['Total']); // se avisa, no se pierde callado
 });
 
 test('texto para copiar', () => {

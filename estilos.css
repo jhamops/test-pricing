@@ -456,3 +456,20 @@ textarea {
 .paso-pct button { width: 32px; }
 .paso-pct input { width: 34px; }
 .tabla .clave { font-size: .82rem; padding: 0 6px; }
+
+/* ── Pegar varios ── */
+.ejemplos { margin: 0 0 10px; display: grid; gap: 4px; }
+.ejemplos div { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; padding: 6px 10px; border-radius: 10px; background: var(--elevado); }
+.ejemplos dt { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .92rem; font-weight: 700; color: var(--texto); }
+.ejemplos dd { margin: 0; color: var(--marca); font-weight: 700; }
+.ejemplos dd::before { content: '→ '; color: var(--texto-3); }
+.pegar-opciones { margin: 10px 0 4px; }
+.pegar-opciones .porcentajes-titulo { margin: 0 0 6px; }
+.vista-pegado { color: inherit; font-weight: inherit; }
+.pg-lista { list-style: none; margin: 8px 0 0; padding: 0; border-top: 1px solid var(--borde); }
+.pg-lista li { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--borde); }
+.pg-nombre, .pg-precio { display: flex; flex-direction: column; min-width: 0; }
+.pg-nombre b { overflow-wrap: anywhere; }
+.pg-nombre small, .pg-precio small { color: var(--texto-2); font-size: .85rem; font-weight: 600; }
+.pg-precio { text-align: right; font-weight: 900; color: var(--marca); font-size: 1.05rem; }
+.pg-malas { margin: 8px 0 0; padding: 8px 10px; border-radius: 10px; color: var(--texto); background: color-mix(in srgb, #d97706 14%, var(--superficie)); border: 1px solid color-mix(in srgb, #d97706 35%, var(--superficie)); }

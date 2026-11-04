@@ -156,9 +156,19 @@
                 <button class="boton-icono" value="cerrar" aria-label="Cerrar">✕</button>
             </div>
             <div class="dialogo-cuerpo">
-                <p class="ayuda">Uno por línea: nombre y precio de compra. <b>x 36</b> o <b>36 und</b> es la cantidad. Se les pone la ganancia que tienes elegida.</p>
-                <textarea id="pegado" rows="8" placeholder="Pelota de vóley 18 x 6&#10;Cono 30 cm 3.50 x 24&#10;Guitarra acústica 160&#10;Mancuerna 2 kg 22 x 4"></textarea>
-                <p class="vista-pegado" id="vista-pegado" aria-live="polite"></p>
+                <p class="ayuda chico">Una línea por producto. Escríbelo, díctalo con el micrófono del teclado, o pega de un WhatsApp, una factura o un Excel.</p>
+                <dl class="ejemplos">
+                    <div><dt>Cono 30 cm 3.50</dt><dd>compra S/ 3.50</dd></div>
+                    <div><dt>Pelota de vóley 18 x 6</dt><dd>6 unidades</dd></div>
+                    <div><dt>Silbato 28.80 la docena</dt><dd>por docena, S/ 2.40 c/u</dd></div>
+                    <div><dt>24 Cono 3.50 84.00</dt><dd>de factura: 24 a S/ 3.50</dd></div>
+                </dl>
+                <textarea id="pegado" rows="7" placeholder="Pega o escribe aquí"></textarea>
+                <div class="pegar-opciones">
+                    <p class="porcentajes-titulo" id="titulo-pct-pegar">Ganancia para todos</p>
+                    <div class="chips chico" id="pegar-pct" role="group" aria-labelledby="titulo-pct-pegar"></div>
+                </div>
+                <div id="vista-pegado" class="vista-pegado" aria-live="polite"></div>
             </div>
             <div class="dialogo-pie">
                 <button class="boton-texto" value="cerrar">Cancelar</button>
