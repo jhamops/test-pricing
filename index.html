@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>Calculadora de precios · ILLAK</title>
+    <meta name="description" content="Escribe lo que te costó y te digo a cuánto venderlo por docena y suelto, con tu regla de siempre. Hecho por ILLAK.">
+    <meta name="theme-color" content="#047857">
+    <link rel="icon" href="marca/app-192.png">
+    <link rel="apple-touch-icon" href="marca/app-apple-180.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="estilos.css">
+</head>
+<body>
+    <header class="cabecera">
+        <div class="marca">
+            <img src="marca/escudo.svg" alt="" width="44" height="44">
+            <div>
+                <strong>Calculadora de precios</strong>
+                <span>hecho por <b>ILLAK</b></span>
+            </div>
+        </div>
+        <div class="acciones-cabecera">
+            <button type="button" class="boton-icono" id="tema" aria-label="Cambiar entre claro y oscuro" title="Claro u oscuro"><svg class="icono-luna" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg><svg class="icono-sol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></button>
+            <button type="button" class="boton-secundario" id="abrir-regla">⚙ Tu regla</button>
+        </div>
+    </header>
+
+    <main>
+        <section class="entrada" aria-labelledby="titulo-entrada">
+            <h1 id="titulo-entrada">¿Cuánto te costó?</h1>
+            <p class="ayuda">Escribe el costo y te digo a cuánto venderlo. <b>Enter</b> y sigues con el siguiente.</p>
+            <form id="form-nuevo" autocomplete="off">
+                <label class="campo campo-nombre">Producto
+                    <input id="nuevo-nombre" placeholder="Ej.: Valla fija 30 cm" enterkeyhint="next">
+                </label>
+                <label class="campo campo-costo">Costo c/u
+                    <span class="con-sol"><span aria-hidden="true">S/</span><input id="nuevo-costo" inputmode="decimal" placeholder="0.00" enterkeyhint="done" required></span>
+                </label>
+                <label class="campo campo-cant">Cantidad
+                    <input id="nuevo-cant" inputmode="numeric" placeholder="opcional" enterkeyhint="done">
+                </label>
+                <button type="submit" class="boton-principal" id="agregar">+ Agregar</button>
+            </form>
+            <div id="vista-previa" class="vista-previa" aria-live="polite"></div>
+            <div class="mas-formas">
+                <button type="button" class="enlace" id="abrir-pegar">📋 Pegar varios de una vez</button>
+                <span>de una factura, una lista o un WhatsApp</span>
+            </div>
+        </section>
+
+        <section class="barra" aria-label="Tu lista" id="barra" hidden>
+            <div class="cuenta" id="cuenta"></div>
+            <label class="flete">Flete de esta compra
+                <span class="con-sol"><span aria-hidden="true">S/</span><input id="flete" inputmode="decimal" placeholder="0.00"></span>
+            </label>
+            <div class="botones-barra">
+                <button type="button" class="boton-secundario" id="copiar-todo">Copiar lista</button>
+                <button type="button" class="boton-secundario" id="imprimir">Imprimir</button>
+                <button type="button" class="boton-texto" id="vaciar">Empezar otra</button>
+            </div>
+            <p class="nota-flete" id="nota-flete" hidden></p>
+        </section>
+
+        <ul class="lista" id="lista" aria-label="Productos"></ul>
+
+        <section class="totales" id="totales" hidden aria-label="Si vendes todo"></section>
+
+        <section class="vacio" id="vacio">
+            <p><b>Prueba con uno:</b> escribe «Valla fija 30 cm» y costo <b>12</b>. Te sale el precio por docena, el suelto, cuánto ganas y tu clave del cuaderno.</p>
+        </section>
+    </main>
+
+    <footer class="pie">
+        <p>Hecho por <b>ILLAK</b> · el sistema para tiendas del Perú.</p>
+        <p>Tus costos y tu regla se guardan <b>solo en este equipo</b>. No se mandan a ningún lado.</p>
+    </footer>
+
+    <dialog id="dialogo-regla" aria-labelledby="titulo-regla">
+        <form method="dialog" class="dialogo">
+            <div class="dialogo-tope">
+                <h2 id="titulo-regla">Tu regla de precios</h2>
+                <button class="boton-icono" value="cerrar" aria-label="Cerrar">✕</button>
+            </div>
+            <div class="dialogo-cuerpo">
+                <p class="ayuda">Sale de tu cuaderno: a la <b>docena</b> le sumas un porcentaje al costo, y el <b>suelto</b> es un poco más caro. Cámbialo cuando quieras: se guarda en este equipo.</p>
+                <table class="tabla-regla">
+                    <thead><tr><th>Familia</th><th>Le sumas</th><th>Suelto, más</th></tr></thead>
+                    <tbody id="regla-familias"></tbody>
+                </table>
+                <h3>Lo demás, según lo que costó</h3>
+                <table class="tabla-regla">
+                    <thead><tr><th>Si costó</th><th>Le sumas</th></tr></thead>
+                    <tbody id="regla-escalera"></tbody>
+                </table>
+                <h3>Cómo compras y cobras</h3>
+                <label class="interruptor"><input type="checkbox" id="regla-factura"> Compro con factura y pago IGV <small>(el «te queda» descuenta el IGV)</small></label>
+                <label class="interruptor"><input type="checkbox" id="regla-tarjeta-on"> A veces me pagan con tarjeta: <span class="con-sol mini"><input id="regla-tarjeta" inputmode="decimal" aria-label="Porcentaje del POS"><span aria-hidden="true">%</span></span></label>
+            </div>
+            <div class="dialogo-pie">
+                <button type="button" class="boton-texto" id="regla-reiniciar">Volver a la regla del cuaderno</button>
+                <button class="boton-principal" value="listo">Listo</button>
+            </div>
+        </form>
+    </dialog>
+
+    <dialog id="dialogo-pegar" aria-labelledby="titulo-pegar">
+        <form method="dialog" class="dialogo">
+            <div class="dialogo-tope">
+                <h2 id="titulo-pegar">Pegar varios productos</h2>
+                <button class="boton-icono" value="cerrar" aria-label="Cerrar">✕</button>
+            </div>
+            <div class="dialogo-cuerpo">
+                <p class="ayuda">Uno por línea: el nombre y lo que costó. Si pones <b>x 36</b> o <b>36 und</b>, es la cantidad (sirve para repartir el flete).</p>
+                <textarea id="pegado" rows="8" placeholder="Valla fija 20 cm 10 x 12&#10;Aro 30 cm 1.90 x 36&#10;Ula 65 cm 9.50&#10;Escalera 6P PVC 18"></textarea>
+                <p class="vista-pegado" id="vista-pegado" aria-live="polite"></p>
+            </div>
+            <div class="dialogo-pie">
+                <button class="boton-texto" value="cerrar">Cancelar</button>
+                <button class="boton-principal" value="agregar" id="pegar-agregar" disabled>Agregar</button>
+            </div>
+        </form>
+    </dialog>
+
+    <div class="aviso" id="aviso" role="status" hidden></div>
+
+    <script type="module" src="app.js"></script>
+</body>
+</html>
