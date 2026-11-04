@@ -177,3 +177,44 @@ export function textoParaCopiar(filas, fecha = new Date()) {
         return partes.join(' · ');
     }).join('\n');
 }
+
+/** El flete por unidad de cada producto: el suyo (entre sus unidades) + su parte del de toda la compra. */
+export function fleteDe(p, productos, fleteGlobal) {
+    const global = Number(p.cantidad) > 0 ? fletePorUnidad(fleteGlobal, productos) : 0;
+    return fleteDelProducto(p.flete, p.cantidad) + global;
+}
+
+/**
+ * La hoja de Excel: una fila por producto y, al final, los totales de la compra.
+ * Números como números (para que se pueda sumar en Excel), no como texto.
+ */
+export const COLUMNAS_EXCEL = [
+    'Producto', 'Precio de compra', 'Cantidad', 'Flete c/u', 'Costo con flete', '% ganancia', 'Tarjeta %',
+    'Docena c/u', 'Docena (x12)', 'Precio suelto', 'Ganas c/u', 'Te queda c/u (sin IGV)', 'Clave',
+];
+export function filasExcel(productos, regla, fleteGlobal = 0, fecha = new Date()) {
+    const tarjeta = regla.tarjetaSiempre === false ? 0 : Number(regla.tarjeta) || 0;
+    const filas = [];
+    let invertido = 0, ganas = 0, queda = 0, conCantidad = 0;
+    for (const p of productos) {
+        const r = calcular({ costo: p.costo, pct: p.pct, flete: fleteDe(p, productos, fleteGlobal) }, regla);
+        if (!r) continue;
+        const n = Number(p.cantidad) > 0 ? Number(p.cantidad) : null;
+        const ganaUnidad = r.porDocena ? r.ganas : r.ganasSuelto;
+        filas.push([
+            p.nombre, r2(Number(p.costo)), n, r2(r.costoConFlete - Number(p.costo)), r.costoConFlete, r.porcentaje, tarjeta,
+            r.porDocena ? r.docenaUnidad : null, r.porDocena ? r.docena : null, r.suelto, ganaUnidad, r.teQueda,
+            clave(p.costo, r.porcentaje, fecha),
+        ]);
+        if (n) {
+            conCantidad += 1;
+            invertido += r.costoConFlete * n;
+            ganas += ganaUnidad * n;
+            queda += r.teQueda * n;
+        }
+    }
+    const totales = conCantidad
+        ? { invertido: r2(invertido), ganas: r2(ganas), queda: r2(queda) }
+        : null;
+    return { columnas: COLUMNAS_EXCEL, filas, totales };
+}

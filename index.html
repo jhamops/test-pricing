@@ -33,8 +33,8 @@
             <div class="entrada-tope">
                 <span class="icono" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M8 6h8M8 10h.01M12 10h.01M16 10h.01M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h4"/></svg></span>
                 <div>
-                    <h1 id="titulo-entrada">¿A cuánto lo vendo?</h1>
-                    <p class="ayuda">Pon el precio de compra y toca cuánto le sumas: el precio cambia al momento. La tarjeta y el flete ya van incluidos.</p>
+                    <h1 id="titulo-entrada">Nuevo precio</h1>
+                    
                 </div>
             </div>
             <form id="form-nuevo" autocomplete="off">
@@ -53,48 +53,58 @@
                     </label>
                 </div>
                 <div class="porcentajes" role="group" aria-labelledby="titulo-pct">
-                    <p class="porcentajes-titulo" id="titulo-pct">¿Cuánto le sumas? <small id="nuevo-sugerido"></small></p>
+                    <p class="porcentajes-titulo" id="titulo-pct">Ganancia</p>
                     <div class="chips" id="nuevo-pct"></div>
                 </div>
                 <div class="fila-final">
                     <label class="cant-chica">Cantidad <small>(opcional)</small>
                         <input id="nuevo-cant" inputmode="numeric" placeholder="—" enterkeyhint="done">
                     </label>
-                    <button type="submit" class="boton-principal" id="agregar">+ Agregar a la lista</button>
+                    <button type="submit" class="boton-principal" id="agregar">Agregar</button>
                 </div>
             </form>
             <div id="vista-previa" class="vista-previa" aria-live="polite"></div>
             <div class="mas-formas">
-                <button type="button" class="enlace" id="abrir-pegar">📋 Pegar varios de una vez</button>
-                <span>de una factura, una lista o un WhatsApp</span>
+                <button type="button" class="enlace" id="abrir-pegar">Pegar varios</button>
             </div>
         </section>
 
         <section class="barra" aria-label="Tu lista" id="barra" hidden>
-            <div class="cuenta" id="cuenta"></div>
-            <label class="flete">Flete de esta compra
-                <span class="con-sol"><span aria-hidden="true">S/</span><input id="flete" inputmode="decimal" placeholder="0.00"></span>
-            </label>
+            <h2 class="cuenta" id="cuenta"></h2>
             <div class="botones-barra">
-                <button type="button" class="boton-secundario" id="copiar-todo">Copiar lista</button>
+                <button type="button" class="boton-principal chico" id="excel">Descargar Excel</button>
+                <button type="button" class="boton-secundario" id="copiar-todo">Copiar</button>
                 <button type="button" class="boton-secundario" id="imprimir">Imprimir</button>
-                <button type="button" class="boton-texto" id="vaciar">Empezar otra</button>
+                <button type="button" class="boton-texto" id="vaciar">Vaciar</button>
             </div>
-            <p class="nota-flete" id="nota-flete" hidden></p>
+            <div class="flete-total">
+                <label>Flete de toda la compra
+                    <span class="con-sol"><span aria-hidden="true">S/</span><input id="flete" inputmode="decimal" placeholder="0.00"></span>
+                </label>
+                <p id="nota-flete" aria-live="polite"></p>
+            </div>
         </section>
 
-        <ul class="lista" id="lista" aria-label="Productos"></ul>
+        <div class="tabla-caja" id="tabla-caja" hidden>
+            <table class="tabla">
+                <thead><tr>
+                    <th>Producto</th><th class="num">Compra</th><th class="num">Cant.</th><th class="num">Flete</th>
+                    <th class="num">Ganancia</th><th class="num">Precio</th><th class="num">Ganas c/u</th><th>Clave</th><th><span class="oculto">Quitar</span></th>
+                </tr></thead>
+                <tbody id="lista"></tbody>
+            </table>
+        </div>
 
         <section class="totales" id="totales" hidden aria-label="Si vendes todo"></section>
 
         <section class="vacio" id="vacio">
-            <p><b>Prueba:</b> algo barato (costo <b>3</b>), algo mediano (<b>40</b>) y algo caro (<b>160</b>). Lo barato sale por docena y suelto; lo caro, con un precio que termina en 8.</p>
+            <p>Tu lista aparece aquí.</p>
         </section>
     </main>
 
     <footer class="pie">
         <p>Hecho por <b>ILLAK</b> · el sistema para tiendas del Perú.</p>
-        <p>Tus costos y tu regla se guardan <b>solo en este equipo</b>. No se mandan a ningún lado.</p>
+        <p>Se guarda solo en este equipo.</p>
     </footer>
 
     <dialog id="dialogo-regla" aria-labelledby="titulo-regla">
@@ -104,13 +114,9 @@
                 <button class="boton-icono" value="cerrar" aria-label="Cerrar">✕</button>
             </div>
             <div class="dialogo-cuerpo">
-                <p class="ayuda">Una sola regla para todo lo que vendes. Cámbiala cuando quieras: se guarda en este equipo y los ejemplos se actualizan solos.</p>
+                
 
-                <h3><span class="paso">1</span> El porcentaje sugerido, según lo que te costó</h3>
-                <p class="ayuda chico">Es el botón que aparece marcado al poner el precio de compra. Tú tocas el que quieras: a lo barato se le suma más (si no, no ganas nada en soles); a lo caro, menos.</p>
-                <div class="escalones" id="regla-escalera"></div>
-
-                <h3><span class="paso">2</span> Docena y suelto</h3>
+                <h3><span class="paso">1</span> Docena y suelto</h3>
                 <label class="interruptor"><input type="checkbox" id="regla-docena-on"> Saco precio <b>por docena</b> (además del suelto)</label>
                 <div class="linea-regla" id="linea-docena">
                     <span>Lo que te cuesta menos de</span>
@@ -121,9 +127,9 @@
                 </div>
                 <p class="ejemplo" id="ej-docena"></p>
 
-                <h3><span class="paso">3</span> Cómo redondeas</h3>
+                <h3><span class="paso">2</span> Redondeo</h3>
                 <label class="interruptor"><input type="checkbox" id="regla-8-on"> Lo caro <b>termina en 8</b> <small>(opcional)</small></label>
-                <p class="ejemplo">Busca el precio terminado en 8 más cercano: <b>S/ 200 → S/ 198</b>, S/ 203.85 → S/ 208, S/ 196.25 → S/ 198. El cliente ve «198 y no 200»: ya trae su rebaja y no pide que le bajes un sol más. A veces sube unos soles, a veces baja.</p>
+                <p class="ejemplo">El terminado en 8 más cercano: S/ 200 → S/ 198 · S/ 203.85 → S/ 208.</p>
                 <div class="linea-regla">
                     <span>Hasta</span>
                     <span class="con-sol mini"><span aria-hidden="true">S/</span><input id="regla-al-sol" inputmode="decimal" aria-label="Desde qué precio se redondea al sol"></span>
@@ -133,10 +139,10 @@
                 </div>
                 <p class="ejemplo" id="ej-redondeo"></p>
 
-                <h3><span class="paso">4</span> Cómo compras y cobras</h3>
+                <h3><span class="paso">3</span> Compra y cobro</h3>
                 <label class="interruptor"><input type="checkbox" id="regla-factura"> Compro con factura y pago IGV <small>(«te queda» descuenta el IGV)</small></label>
                 <label class="interruptor"><input type="checkbox" id="regla-tarjeta-siempre"> La comisión de tarjeta va <b>siempre</b> en el precio: <span class="con-sol mini"><input id="regla-tarjeta" inputmode="decimal" aria-label="Porcentaje del POS"><span aria-hidden="true">%</span></span></label>
-                <p class="ejemplo">Se pague con lo que se pague: el precio se divide entre (1 − ese %): con 3 %, entre 0.97 (no se suma 3 %). Así, después de la comisión te queda exacto lo que querías ganar.</p>
+                <p class="ejemplo">El precio se divide entre (1 − ese %), así la comisión no te quita ganancia.</p>
             </div>
             <div class="dialogo-pie">
                 <button type="button" class="boton-texto" id="regla-reiniciar">Volver a la regla de siempre</button>
@@ -152,7 +158,7 @@
                 <button class="boton-icono" value="cerrar" aria-label="Cerrar">✕</button>
             </div>
             <div class="dialogo-cuerpo">
-                <p class="ayuda">Uno por línea: el nombre y lo que costó. Si pones <b>x 36</b> o <b>36 und</b>, es la cantidad (sirve para repartir el flete).</p>
+                <p class="ayuda">Uno por línea: nombre y precio de compra. <b>x 36</b> o <b>36 und</b> es la cantidad. Se les pone la ganancia que tienes elegida.</p>
                 <textarea id="pegado" rows="8" placeholder="Pelota de vóley 18 x 6&#10;Cono 30 cm 3.50 x 24&#10;Guitarra acústica 160&#10;Mancuerna 2 kg 22 x 4"></textarea>
                 <p class="vista-pegado" id="vista-pegado" aria-live="polite"></p>
             </div>

@@ -374,3 +374,69 @@ textarea {
 .vista-previa .grande b { font-size: 1.45rem; }
 .datos { grid-template-columns: 1.3fr 1fr; }
 .antes-red { color: var(--texto-2); font-weight: 600; font-size: .9rem; }
+
+/* ── Sobrio: la lista como tabla, el flete de la compra a la vista, Excel ── */
+.oculto { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.entrada-tope h1 { font-size: 1.25rem; }
+.mas-formas { padding-top: 4px; }
+.barra { grid-template-columns: auto 1fr; align-items: center; }
+.barra .cuenta { margin: 0; font-size: 1.1rem; font-weight: 800; color: var(--texto); }
+.boton-principal.chico { min-height: 44px; font-size: .95rem; padding: 0 16px; }
+.flete-total {
+    grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px 16px;
+    padding: 12px 14px; border-radius: var(--radio);
+    background: linear-gradient(100deg, color-mix(in srgb, var(--aviso-tinta) 10%, var(--superficie)) 0%, var(--superficie) 62%);
+    border: 1px solid color-mix(in srgb, var(--aviso-tinta) 22%, var(--borde));
+}
+.flete-total label { display: flex; flex-direction: column; gap: 4px; font-weight: 800; font-size: .85rem; color: var(--texto-2); }
+.flete-total .con-sol { min-height: 44px; width: 180px; font-size: 1.05rem; }
+.flete-total p { margin: 0 0 10px; color: var(--texto-2); font-weight: 600; }
+.flete-total p b { color: var(--texto); }
+.aviso-cant { color: var(--aviso-tinta); font-weight: 800; }
+
+.tabla-caja { margin-top: 12px; border: 1px solid var(--borde); border-radius: var(--radio); background: var(--superficie); overflow-x: auto; }
+.tabla { width: 100%; border-collapse: collapse; }
+.tabla th { text-align: left; font-size: .78rem; font-weight: 800; color: var(--texto-3); padding: 10px 8px; border-bottom: 1px solid var(--borde); white-space: nowrap; }
+.tabla td { padding: 8px; border-top: 1px solid var(--borde); vertical-align: middle; }
+.tabla tr:first-child td { border-top: 0; }
+.tabla th.num, .tabla td.num { text-align: right; }
+.tabla input { font: inherit; color: var(--texto); }
+.tabla .nombre { width: 100%; min-width: 150px; min-height: 40px; margin: 0; padding: 0 8px; font-size: 1rem; font-weight: 800; border-radius: 10px; }
+.tabla .con-sol { min-height: 40px; width: 104px; display: inline-flex; padding: 0 8px; font-size: .98rem; border-width: 1px; border-radius: 10px; }
+.tabla .con-sol input { text-align: right; }
+.tabla .cant { width: 64px; min-height: 40px; border-radius: 10px; border: 1px solid var(--borde); background: var(--superficie); padding: 0 8px; text-align: right; }
+.tabla .cant.falta-cant { border: 2px solid var(--aviso-tinta); }
+.tabla .calc b { display: block; font-size: 1.05rem; color: var(--texto); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tabla td[data-c="precio"] b { color: var(--ok); font-size: 1.15rem; }
+.tabla .calc small, .tabla td small { display: block; color: var(--texto-3); font-weight: 600; font-size: .8rem; white-space: nowrap; }
+.tabla td .calc small { margin-top: 2px; }
+.tabla .clave { min-height: 36px; padding: 0 8px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .9rem; white-space: nowrap; }
+.tabla .quitar { width: 40px; height: 40px; }
+.tabla .fila.nuevo { animation: aparecer .35s ease; }
+.paso-pct { display: inline-flex; align-items: center; gap: 2px; border: 1px solid var(--borde); border-radius: 10px; padding: 2px; }
+.paso-pct button { width: 36px; height: 36px; border: 0; border-radius: 8px; background: var(--elevado); color: var(--texto); font-size: 1.15rem; font-weight: 800; }
+.paso-pct input { width: 40px; border: 0; background: transparent; text-align: right; font-weight: 800; font-size: 1rem; }
+.paso-pct > span { color: var(--texto-2); font-weight: 700; margin-right: 4px; }
+
+/* Celular: cada producto, una fila compacta en dos columnas. */
+@media (max-width: 760px) {
+    .tabla thead { display: none; }
+    .tabla, .tabla tbody { display: block; }
+    .tabla tr.fila {
+        display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; padding: 12px; border-top: 1px solid var(--borde);
+    }
+    .tabla tr.fila:first-child { border-top: 0; }
+    .tabla td { display: flex; flex-direction: column; gap: 3px; padding: 0; border: 0; text-align: left !important; }
+    .tabla td::before { content: attr(data-label); font-size: .72rem; font-weight: 800; color: var(--texto-3); }
+    .tabla td.col-nombre { grid-column: 1 / span 1; grid-row: 1; }
+    .tabla td.col-quitar { grid-column: 2; grid-row: 1; align-items: flex-end; }
+    .tabla td.col-quitar::before { content: none; }
+    .tabla td.col-nombre { grid-column: 1 / -1; padding-right: 50px; }
+    .tabla .con-sol { width: 100%; }
+    .tabla .cant { width: 100%; }
+}
+@media print { .flete-total, .botones-barra, .col-quitar, .paso-pct button { display: none !important; } }
+@media (max-width: 760px) {
+    .tabla tr.fila { position: relative; }
+    .tabla td.col-quitar { position: absolute; top: 10px; right: 10px; }
+}

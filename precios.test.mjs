@@ -146,3 +146,28 @@ test('el porcentaje que ella toca manda (de 5 en 5, o cualquiera)', () => {
     assert.equal(calcular({ costo: 73, pct: 37 }, suya).porcentaje, 37); // uno aparte, cualquiera
     assert.equal(calcular({ costo: 73, pct: null }, suya).porcentaje, 40); // sin elegir: el sugerido
 });
+
+test('la hoja de Excel: una fila por producto, números como números, y los totales', async () => {
+    const { filasExcel, COLUMNAS_EXCEL } = await import('./precios.js');
+    const marzo = new Date(2026, 2, 1);
+    const productos = [
+        { nombre: 'Scooter', costo: 85, cantidad: 2, flete: '4', pct: 45 },
+        { nombre: 'Cono', costo: 3, cantidad: 24, flete: '', pct: 50 },
+        { nombre: 'Sin cantidad', costo: 10, cantidad: null, flete: '', pct: 40 },
+    ];
+    const { columnas, filas, totales } = filasExcel(productos, SIN_TARJETA, 26, marzo);
+    assert.deepEqual(columnas, COLUMNAS_EXCEL);
+    assert.equal(filas.length, 3);
+    // Scooter: su flete 4 / 2 = 2 c/u, más 26 / 26 unidades = 1 → 3 c/u; costo con flete 88.
+    const [scooter, cono, sinCant] = filas;
+    assert.deepEqual(scooter.slice(0, 7), ['Scooter', 85, 2, 3, 88, 45, 0]);
+    assert.equal(scooter[9], calcular({ costo: 85, pct: 45, flete: 3 }, SIN_TARJETA).suelto);
+    assert.equal(scooter[12], '03 85 26 45');
+    assert.equal(typeof cono[8], 'number'); // la docena, como número
+    assert.equal(cono[3], 1); // 26 / 26 unidades
+    assert.equal(sinCant[2], null); // sin cantidad: celda vacía y sin flete de la compra
+    assert.equal(sinCant[3], 0);
+    assert.ok(totales && totales.invertido === 88 * 2 + 4 * 24, JSON.stringify(totales));
+    // Sin ninguna cantidad no hay totales que mostrar.
+    assert.equal(filasExcel([productos[2]], SIN_TARJETA).totales, null);
+});
