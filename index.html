@@ -39,7 +39,7 @@
             </div>
             <form id="form-nuevo" autocomplete="off">
                 <label class="campo campo-nombre">Producto
-                    <input id="nuevo-nombre" placeholder="Ej.: Valla fija 30 cm" enterkeyhint="next">
+                    <input id="nuevo-nombre" placeholder="Ej.: Pelota de vóley" enterkeyhint="next">
                 </label>
                 <label class="campo campo-costo">Costo c/u
                     <span class="con-sol"><span aria-hidden="true">S/</span><input id="nuevo-costo" inputmode="decimal" placeholder="0.00" enterkeyhint="done" required></span>
@@ -74,7 +74,7 @@
         <section class="totales" id="totales" hidden aria-label="Si vendes todo"></section>
 
         <section class="vacio" id="vacio">
-            <p><b>Prueba con uno:</b> escribe «Valla fija 30 cm» y costo <b>12</b>. Te sale el precio por docena, el suelto, cuánto ganas y tu clave del cuaderno.</p>
+            <p><b>Prueba:</b> algo barato (costo <b>3</b>), algo mediano (<b>40</b>) y algo caro (<b>160</b>). Lo barato sale por docena y suelto; lo caro, con un precio que termina en 8.</p>
         </section>
     </main>
 
@@ -90,22 +90,47 @@
                 <button class="boton-icono" value="cerrar" aria-label="Cerrar">✕</button>
             </div>
             <div class="dialogo-cuerpo">
-                <p class="ayuda">Sale de tu cuaderno: a la <b>docena</b> le sumas un porcentaje al costo, y el <b>suelto</b> es un poco más caro. Cámbialo cuando quieras: se guarda en este equipo.</p>
-                <table class="tabla-regla">
-                    <thead><tr><th>Familia</th><th>Le sumas</th><th>Suelto, más</th></tr></thead>
-                    <tbody id="regla-familias"></tbody>
-                </table>
-                <h3>Lo demás, según lo que costó</h3>
-                <table class="tabla-regla">
-                    <thead><tr><th>Si costó</th><th>Le sumas</th></tr></thead>
-                    <tbody id="regla-escalera"></tbody>
-                </table>
-                <h3>Cómo compras y cobras</h3>
-                <label class="interruptor"><input type="checkbox" id="regla-factura"> Compro con factura y pago IGV <small>(el «te queda» descuenta el IGV)</small></label>
+                <p class="ayuda">Una sola regla para todo lo que vendes. Cámbiala cuando quieras: se guarda en este equipo y los ejemplos se actualizan solos.</p>
+
+                <h3><span class="paso">1</span> Cuánto le sumas, según lo que te costó</h3>
+                <p class="ayuda chico">A lo barato le sumas más (si no, no ganas nada en soles); a lo caro, menos (ya ganas bastante en soles).</p>
+                <div class="escalones" id="regla-escalera"></div>
+
+                <h3><span class="paso">2</span> Docena y suelto</h3>
+                <div class="linea-regla">
+                    <span>Lo que te cuesta menos de</span>
+                    <span class="con-sol mini"><span aria-hidden="true">S/</span><input id="regla-docena" inputmode="decimal" aria-label="Se vende por docena si cuesta menos de"></span>
+                    <span>se vende <b>por docena</b>; el <b>suelto</b> cuesta</span>
+                    <span class="con-sol mini"><input id="regla-suelto" inputmode="decimal" aria-label="El suelto, cuánto más"><span aria-hidden="true">%</span></span>
+                    <span>más.</span>
+                </div>
+                <p class="ejemplo" id="ej-docena"></p>
+
+                <h3><span class="paso">3</span> Cómo redondeas</h3>
+                <div class="linea-regla">
+                    <span>Hasta</span>
+                    <span class="con-sol mini"><span aria-hidden="true">S/</span><input id="regla-al-sol" inputmode="decimal" aria-label="Desde qué precio se redondea al sol"></span>
+                    <span>a 10 céntimos; de ahí, al sol; y desde</span>
+                    <span class="con-sol mini"><span aria-hidden="true">S/</span><input id="regla-en-8" inputmode="decimal" aria-label="Desde qué precio termina en 8"></span>
+                    <span><b>termina en 8</b>.</span>
+                </div>
+                <p class="ejemplo" id="ej-redondeo"></p>
+
+                <h3><span class="paso">4</span> Cuando un producto es distinto</h3>
+                <div class="linea-regla">
+                    <span>Con <b>mucha competencia</b>, le sumas</span>
+                    <span class="con-sol mini"><input id="regla-competencia" inputmode="numeric" aria-label="Puntos con mucha competencia"><span aria-hidden="true">pts</span></span>
+                    <span>; si es <b>rentable</b> (poca competencia, se vende solo),</span>
+                    <span class="con-sol mini"><input id="regla-rentable" inputmode="numeric" aria-label="Puntos si es rentable"><span aria-hidden="true">pts</span></span>
+                </div>
+                <p class="ejemplo" id="ej-ajuste"></p>
+
+                <h3><span class="paso">5</span> Cómo compras y cobras</h3>
+                <label class="interruptor"><input type="checkbox" id="regla-factura"> Compro con factura y pago IGV <small>(«te queda» descuenta el IGV)</small></label>
                 <label class="interruptor"><input type="checkbox" id="regla-tarjeta-on"> A veces me pagan con tarjeta: <span class="con-sol mini"><input id="regla-tarjeta" inputmode="decimal" aria-label="Porcentaje del POS"><span aria-hidden="true">%</span></span></label>
             </div>
             <div class="dialogo-pie">
-                <button type="button" class="boton-texto" id="regla-reiniciar">Volver a la regla del cuaderno</button>
+                <button type="button" class="boton-texto" id="regla-reiniciar">Volver a la regla de siempre</button>
                 <button class="boton-principal" value="listo">Listo</button>
             </div>
         </form>
@@ -119,7 +144,7 @@
             </div>
             <div class="dialogo-cuerpo">
                 <p class="ayuda">Uno por línea: el nombre y lo que costó. Si pones <b>x 36</b> o <b>36 und</b>, es la cantidad (sirve para repartir el flete).</p>
-                <textarea id="pegado" rows="8" placeholder="Valla fija 20 cm 10 x 12&#10;Aro 30 cm 1.90 x 36&#10;Ula 65 cm 9.50&#10;Escalera 6P PVC 18"></textarea>
+                <textarea id="pegado" rows="8" placeholder="Pelota de vóley 18 x 6&#10;Cono 30 cm 3.50 x 24&#10;Guitarra acústica 160&#10;Mancuerna 2 kg 22 x 4"></textarea>
                 <p class="vista-pegado" id="vista-pegado" aria-live="polite"></p>
             </div>
             <div class="dialogo-pie">

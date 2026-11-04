@@ -1,88 +1,97 @@
 /**
  * La cuenta del precio, sin pantalla (se prueba con `node --test`).
  *
- * La regla sale del cuaderno de la tienda (pedido de marzo 2026): el precio por DOCENA
- * es el costo más un porcentaje que depende de la familia (o, para lo demás, del costo:
- * lo barato lleva más porcentaje). El precio SUELTO es la docena con un recargo, y lo
- * que solo se vende suelto (escaleras, cinta) lleva el porcentaje directo.
+ * Una regla GENERAL, como piensa quien pone los precios (no producto por producto):
  *
- * La clave es la de su cuaderno: mes · costo («/» en vez del punto) · año · porcentaje.
+ * 1. Cuánto le sumas depende de lo que te costó: a lo barato, más porcentaje (si no,
+ *    no ganas nada en soles); a lo caro, menos (ya ganas bastante en soles).
+ * 2. Lo barato se vende por docena (precio por unidad) y suelto, un poco más caro.
+ * 3. Cómo se redondea depende del precio: lo barato a 10 céntimos, lo mediano al sol,
+ *    y lo caro termina en 8 (98 en vez de 100): ya trae su rebaja y no se rebaja más.
+ * 4. Un producto con mucha competencia lleva menos; uno que se vende solo, más.
+ *
+ * La clave es la del cuaderno: mes · costo («/» en vez del punto) · año · porcentaje.
  *   03 | 10 | 26 | 50  →  marzo, costó S/ 10, 2026, le suma 50 %.
  */
 
-/** Familias con su regla. `palabras` sirve para reconocer la familia por el nombre. */
-export const FAMILIAS_INICIALES = [
-    { id: 'aros', nombre: 'Aros', palabras: ['aro'], docena: 70, suelto: 10, redondeoSuelto: 0.5, soloSuelto: false },
-    { id: 'varillas', nombre: 'Varillas', palabras: ['varilla'], docena: 75, suelto: 20, redondeoSuelto: 0.5, soloSuelto: false },
-    { id: 'ulas', nombre: 'Ulas', palabras: ['ula', 'hula'], docena: 35, suelto: 5, redondeoSuelto: 0.5, soloSuelto: false },
-    { id: 'estacas', nombre: 'Estacas', palabras: ['estaca'], docena: 45, suelto: 7, redondeoSuelto: 0.5, soloSuelto: false },
-    { id: 'vallas', nombre: 'Vallas', palabras: ['valla'], docena: 42, suelto: 22, redondeoSuelto: 0.5, soloSuelto: false },
-    { id: 'escaleras', nombre: 'Escaleras', palabras: ['escalera'], docena: 65, suelto: 0, redondeoSuelto: 1, soloSuelto: true },
-    { id: 'cintas', nombre: 'Cintas', palabras: ['cinta'], docena: 47, suelto: 0, redondeoSuelto: 1, soloSuelto: true },
-];
-
-/** Para lo que no es de ninguna familia: el porcentaje según lo que costó. */
-export const ESCALERA_INICIAL = [
-    { hasta: 4, docena: 70 },
-    { hasta: 8, docena: 55 },
-    { hasta: 16, docena: 45 },
-    { hasta: null, docena: 47 },
-];
-
 export const REGLA_INICIAL = {
-    familias: FAMILIAS_INICIALES,
-    escalera: ESCALERA_INICIAL,
-    sueltoOtros: 15,
-    redondeoDocena: 0.1,
-    redondeoSueltoOtros: 0.5,
-    conFactura: true, // compra con factura y paga IGV (RMT o general): la ganancia se mide sin IGV
-    tarjeta: 3, // % que cobra el POS (Culqi), solo para «si te paga con tarjeta»
+    // Si costó menos que `hasta`, le sumas `pct` %. El último no tiene tope.
+    escalera: [
+        { hasta: 5, pct: 60 },
+        { hasta: 20, pct: 45 },
+        { hasta: 60, pct: 50 },
+        { hasta: 150, pct: 40 },
+        { hasta: null, pct: 30 },
+    ],
+    docenaHasta: 18, // lo que cuesta menos que esto se vende por docena y suelto
+    recargoSuelto: 15, // el suelto, este % más que la unidad por docena
+    redondeoAlSolDesde: 10, // desde este precio se redondea al sol (antes, a 10 céntimos)
+    terminaEn8Desde: 100, // desde este precio termina en 8
+    ajustes: { competencia: -10, rentable: 15 }, // puntos que se restan o suman al %
+    conFactura: true, // compra con factura y paga IGV: la ganancia se mide sin IGV
+    tarjeta: 3, // % del POS, solo para «si te paga con tarjeta»
+    tarjetaOn: true,
 };
 
 const r2 = (n) => Math.round(n * 100) / 100;
-/** Redondea al múltiplo más cercano (0.10, 0.50, 1.00). */
-export const redondear = (n, paso) => (paso > 0 ? r2(Math.round(n / paso) * paso) : r2(n));
+/** Al múltiplo más cercano (0.10, 0.50, 1). */
+export const redondear = (n, paso) => r2(Math.round(r2(n / paso)) * paso);
 
-/** La familia por el nombre del producto («Valla fija 20 cm» → vallas). */
-export function familiaDe(nombre, familias) {
-    const t = ` ${String(nombre || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')} `;
-    return familias.find((f) => f.palabras.some((p) => new RegExp(`[^a-z]${p}s?[^a-z]`).test(t))) || null;
+/** El número terminado en 8 más cercano: 203.85 → 208, 196.25 → 198, 337.50 → 338. */
+export function terminadoEn8(x) {
+    const abajo = Math.floor((x - 8) / 10) * 10 + 8;
+    const arriba = abajo + 10;
+    return x - abajo <= arriba - x ? abajo : arriba;
 }
 
-/** El porcentaje que le toca: el del producto si se cambió, el de su familia, o el de la escalera. */
-export function porcentajeDe(costo, familia, regla, propio = null) {
-    if (propio != null && propio !== '' && Number.isFinite(Number(propio))) return Number(propio);
-    if (familia) return familia.docena;
-    const escalon = regla.escalera.find((e) => e.hasta == null || costo < e.hasta) || regla.escalera[regla.escalera.length - 1];
-    return escalon.docena;
+/** El precio redondeado como lo haría ella, según cuánto es. */
+export function redondearPrecio(x, regla) {
+    if (x >= regla.terminaEn8Desde) return terminadoEn8(x);
+    if (x >= regla.redondeoAlSolDesde) return Math.round(x);
+    return redondear(x, 0.1);
+}
+
+/** El escalón que le toca a ese costo (su índice y su %). */
+export function escalonDe(costo, regla) {
+    const i = regla.escalera.findIndex((e) => e.hasta == null || costo < e.hasta);
+    return i < 0 ? regla.escalera.length - 1 : i;
+}
+
+/** El % para ese costo, con el ajuste del producto (normal, competencia, rentable). */
+export function porcentajeDe(costo, regla, ajuste = 'normal') {
+    const base = regla.escalera[escalonDe(costo, regla)].pct;
+    const extra = ajuste === 'competencia' ? regla.ajustes.competencia : ajuste === 'rentable' ? regla.ajustes.rentable : 0;
+    return Math.max(0, base + extra);
 }
 
 /**
  * Todo lo de un producto. `costo` es por unidad (con IGV si compró con factura);
  * `flete` es lo que le toca de flete a cada unidad.
  */
-export function calcular({ costo, flete = 0, familia = null, propio = null }, regla) {
+export function calcular({ costo, flete = 0, ajuste = 'normal' }, regla) {
     const c = Number(costo);
     if (!(c > 0)) return null;
-    const base = r2(c + (Number(flete) || 0));
-    const pct = porcentajeDe(c, familia, regla, propio);
-    const soloSuelto = Boolean(familia?.soloSuelto);
+    const f = Number(flete) || 0;
+    const base = r2(c + f);
+    const pct = porcentajeDe(c, regla, ajuste);
     const conPct = base * (1 + pct / 100);
-    const docenaUnidad = soloSuelto ? null : redondear(conPct, regla.redondeoDocena);
-    const recargo = familia ? familia.suelto : regla.sueltoOtros;
-    const pasoSuelto = familia ? familia.redondeoSuelto : regla.redondeoSueltoOtros;
-    const suelto = soloSuelto ? redondear(conPct, pasoSuelto) : redondear(docenaUnidad * (1 + recargo / 100), pasoSuelto);
-    // Lo que se gana por unidad (vendiendo por docena, o suelto si solo va suelto).
-    const venta = soloSuelto ? suelto : docenaUnidad;
+    const porDocena = c < regla.docenaHasta;
+    let docenaUnidad = null, suelto;
+    if (porDocena) {
+        docenaUnidad = redondear(conPct, 0.1);
+        suelto = redondear(docenaUnidad * (1 + regla.recargoSuelto / 100), 0.5);
+        if (suelto <= docenaUnidad) suelto = r2(docenaUnidad + 0.5);
+    } else {
+        suelto = redondearPrecio(conPct, regla);
+    }
+    const venta = porDocena ? docenaUnidad : suelto;
     const ganas = r2(venta - base);
-    // Con factura y pagando IGV, de lo ganado una parte es IGV que va a SUNAT: se mide sin él.
-    const teQueda = regla.conFactura ? r2((venta - c) / 1.18 - (Number(flete) || 0)) : ganas;
-    const conTarjeta = r2(teQueda - venta * (regla.tarjeta / 100));
+    const teQueda = regla.conFactura ? r2((venta - c) / 1.18 - f) : ganas;
     return {
-        porcentaje: pct, costoConFlete: base, soloSuelto,
-        docenaUnidad, docena: docenaUnidad == null ? null : r2(docenaUnidad * 12),
-        suelto, ganas, ganasSuelto: r2(suelto - base), teQueda, conTarjeta,
-        margenReal: venta > 0 ? Math.round((teQueda / (regla.conFactura ? venta / 1.18 : venta)) * 100) : 0,
+        porcentaje: pct, costoConFlete: base, porDocena, sinRedondear: r2(conPct),
+        docenaUnidad, docena: porDocena ? r2(docenaUnidad * 12) : null,
+        suelto, ganas, ganasSuelto: r2(suelto - base), teQueda,
+        conTarjeta: r2(teQueda - venta * ((regla.tarjetaOn === false ? 0 : regla.tarjeta) / 100)),
     };
 }
 
@@ -106,9 +115,6 @@ export function fletePorUnidad(fleteTotal, productos) {
 /**
  * Varios productos pegados (de una lista, una factura copiada, un WhatsApp). Una línea
  * por producto: el último número es el costo; «x 36» o «36 und» es la cantidad.
- *   «Valla fija 20 cm 10»      → Valla fija 20 cm · costo 10
- *   «Aro 20cm 1.20 x 36»       → Aro 20cm · costo 1.20 · 36 unidades
- *   «Ula 65 cm  S/ 9,50  24u»  → Ula 65 cm · costo 9.50 · 24 unidades
  */
 export function leerPegado(texto) {
     const salida = [];
@@ -137,8 +143,8 @@ export function textoParaCopiar(filas, fecha = new Date()) {
     const s = (n) => `S/ ${Number(n).toFixed(2)}`;
     return filas.map(({ nombre, costo, r }) => {
         const partes = [nombre];
-        if (r.docena != null) partes.push(`docena ${s(r.docena)} (${s(r.docenaUnidad)} c/u)`);
-        partes.push(`suelto ${s(r.suelto)}`);
+        if (r.porDocena) partes.push(`docena ${s(r.docena)} (${s(r.docenaUnidad)} c/u)`, `suelto ${s(r.suelto)}`);
+        else partes.push(`precio ${s(r.suelto)}`);
         partes.push(`clave ${clave(costo, r.porcentaje, fecha)}`);
         return partes.join(' · ');
     }).join('\n');

@@ -3,11 +3,15 @@
 Escribe lo que te costó y te dice a cuánto venderlo **por docena** y **suelto**, cuánto ganas,
 cuánto te queda después del IGV y la **clave del cuaderno** (`mes costo año %`, p. ej. `03 10 26 50`).
 
+- **Una sola regla general**, no producto por producto:
+  1. cuánto le sumas según lo que costó (a lo barato más %, a lo caro menos);
+  2. lo barato se vende por docena y suelto, lo caro con un solo precio;
+  3. redondeo según el precio: 10 céntimos, al sol, y lo caro **termina en 8** (98 y no 100: ya trae su rebaja);
+  4. por producto, con un toque: normal, mucha competencia (menos %) o rentable (más %).
 - Uno por uno (Enter y sigues) o **varios pegados** de una factura, lista o WhatsApp.
 - **Flete** de la compra repartido entre las unidades.
-- **Tu regla** (porcentaje por familia y, para lo demás, según lo que costó): se cambia en ⚙ y se
-  guarda solo en el equipo. Viene con la que sale del cuaderno de marzo 2026.
-- Sin servidor ni base de datos: los costos no salen del equipo.
+- La regla se cambia en ⚙ con ejemplos que se actualizan solos, y se guarda solo en el equipo
+  (si borras los datos del navegador, se pierde). Sin servidor ni base de datos.
 
 ## Archivos
 

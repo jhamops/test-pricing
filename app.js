@@ -2,23 +2,37 @@
  * La pantalla. La cuenta vive en `precios.js` (con sus pruebas); aquí solo se escribe,
  * se muestra y se guarda en este equipo (localStorage).
  */
-import { REGLA_INICIAL, calcular, clave, familiaDe, fletePorUnidad, leerPegado, textoParaCopiar } from './precios.js';
+import { REGLA_INICIAL, calcular, clave, escalonDe, fletePorUnidad, leerPegado, redondearPrecio, textoParaCopiar } from './precios.js';
 
-const GUARDADO = 'illak-calculadora-v1';
+const GUARDADO = 'illak-calculadora-v2';
 const $ = (id) => document.getElementById(id);
 const soles = (n) => `S/ ${Number(n).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const num = (t) => {
-    const n = Number(String(t ?? '').replace(',', '.').replace(/[^\d.]/g, ''));
+    const n = Number(String(t ?? '').replace(',', '.').replace(/[^\d.-]/g, ''));
     return Number.isFinite(n) ? n : 0;
 };
 const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const copia = (o) => JSON.parse(JSON.stringify(o));
+const AJUSTES = [
+    { id: 'normal', texto: 'Normal' },
+    { id: 'competencia', texto: 'Mucha competencia' },
+    { id: 'rentable', texto: 'Rentable' },
+];
 
 // ── Estado (se guarda en este equipo) ──────────────────────────────────────
 let estado = { productos: [], flete: '', regla: copia(REGLA_INICIAL) };
 try {
     const g = JSON.parse(localStorage.getItem(GUARDADO) || 'null');
-    if (g && Array.isArray(g.productos)) estado = { ...estado, ...g, regla: { ...copia(REGLA_INICIAL), ...(g.regla || {}) } };
+    if (g && Array.isArray(g.productos)) {
+        estado = { ...estado, ...g, regla: { ...copia(REGLA_INICIAL), ...(g.regla || {}), ajustes: { ...REGLA_INICIAL.ajustes, ...(g.regla?.ajustes || {}) } } };
+    } else {
+        // La versión anterior tenía familias por producto: se rescata solo la lista.
+        const v1 = JSON.parse(localStorage.getItem('illak-calculadora-v1') || 'null');
+        if (v1 && Array.isArray(v1.productos)) {
+            estado.productos = v1.productos.map((p) => ({ id: p.id, nombre: p.nombre, costo: p.costo, cantidad: p.cantidad, ajuste: 'normal' }));
+            estado.flete = v1.flete || '';
+        }
+    }
 } catch { /* sin guardado: se empieza de cero */ }
 const guardar = () => { try { localStorage.setItem(GUARDADO, JSON.stringify(estado)); } catch { /* modo privado */ } };
 let siguienteId = estado.productos.reduce((m, p) => Math.max(m, p.id), 0) + 1;
@@ -33,17 +47,30 @@ $('tema').addEventListener('click', () => {
     try { localStorage.setItem('illak-calculadora-tema', document.documentElement.dataset.theme); } catch { /* nada */ }
 });
 
-// ── La cuenta de un producto ───────────────────────────────────────────────
-const familiaDelProducto = (p) => {
-    if (p.familiaId === 'otro') return null;
-    if (p.familiaId && p.familiaId !== 'auto') return estado.regla.familias.find((f) => f.id === p.familiaId) || null;
-    return familiaDe(p.nombre, estado.regla.familias);
-};
+// ── La cuenta ──────────────────────────────────────────────────────────────
 const fleteUnidad = () => fletePorUnidad(num(estado.flete), estado.productos);
-const resultado = (p) => calcular({
-    costo: p.costo, familia: familiaDelProducto(p), propio: p.propio,
-    flete: Number(p.cantidad) > 0 ? fleteUnidad() : 0,
-}, estado.regla);
+const resultado = (p) => calcular({ costo: p.costo, ajuste: p.ajuste, flete: Number(p.cantidad) > 0 ? fleteUnidad() : 0 }, estado.regla);
+
+/** «de S/ 5 a S/ 20», «menos de S/ 5», «S/ 150 o más». */
+function rango(i) {
+    const e = estado.regla.escalera;
+    const desde = i > 0 ? e[i - 1].hasta : 0;
+    const hasta = e[i].hasta;
+    if (hasta == null) return `S/ ${desde} o más`;
+    return desde ? `de S/ ${desde} a S/ ${hasta}` : `menos de S/ ${hasta}`;
+}
+/** Un costo de ejemplo para cada escalón. */
+function costoDeEjemplo(i) {
+    const e = estado.regla.escalera;
+    const desde = i > 0 ? e[i - 1].hasta : 0;
+    const hasta = e[i].hasta;
+    if (hasta == null) return Math.round(desde * 1.3);
+    return desde ? Math.round((desde + hasta) / 2) : Math.max(1, Math.round(hasta * 0.6 * 10) / 10);
+}
+/** «docena S/ 4.80 c/u y suelto S/ 5.50» o «S/ 208». */
+function precioCorto(r) {
+    return r.porDocena ? `docena <b>${soles(r.docenaUnidad)}</b> c/u y suelto <b>${soles(r.suelto)}</b>` : `<b>${soles(r.suelto)}</b>`;
+}
 
 // ── Aviso con «Deshacer» ───────────────────────────────────────────────────
 let reloj = null;
@@ -61,18 +88,14 @@ function vistaPrevia() {
     const costo = num($('nuevo-costo').value);
     const caja = $('vista-previa');
     if (!(costo > 0)) { caja.innerHTML = ''; caja.classList.remove('lleno'); return; }
-    const fam = familiaDe($('nuevo-nombre').value, estado.regla.familias);
-    const r = calcular({ costo, familia: fam }, estado.regla);
+    const r = calcular({ costo }, estado.regla);
     caja.classList.add('lleno');
     caja.innerHTML = `
-        <span class="chip">${fam ? esc(fam.nombre) : 'Por costo'} · +${r.porcentaje} %</span>
-        ${r.docena != null ? `<span>Docena <b>${soles(r.docenaUnidad)}</b> c/u</span>` : ''}
-        <span>Suelto <b>${soles(r.suelto)}</b></span>
-        <span class="gana-mini">ganas ${soles(r.soloSuelto ? r.ganasSuelto : r.ganas)}</span>`;
+        <span class="chip">Costó ${rango(escalonDe(costo, estado.regla))} · +${r.porcentaje} %</span>
+        <span>${precioCorto(r)}</span>
+        <span class="gana-mini">ganas ${soles(r.porDocena ? r.ganas : r.ganasSuelto)}</span>`;
 }
-['nuevo-nombre', 'nuevo-costo'].forEach((id) => $(id).addEventListener('input', vistaPrevia));
-
-// Enter en el nombre pasa al costo.
+$('nuevo-costo').addEventListener('input', vistaPrevia);
 $('nuevo-nombre').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); $('nuevo-costo').focus(); } });
 
 $('form-nuevo').addEventListener('submit', (e) => {
@@ -88,7 +111,7 @@ $('form-nuevo').addEventListener('submit', (e) => {
 function agregar(lista) {
     const nuevos = lista.map((x, i) => ({
         id: siguienteId++, nombre: x.nombre || `Producto ${estado.productos.length + i + 1}`,
-        costo: x.costo, cantidad: x.cantidad, familiaId: 'auto', propio: null,
+        costo: x.costo, cantidad: x.cantidad, ajuste: 'normal',
     }));
     estado.productos = [...nuevos.reverse(), ...estado.productos]; // lo último, arriba
     guardar();
@@ -96,27 +119,18 @@ function agregar(lista) {
 }
 
 // ── La lista ───────────────────────────────────────────────────────────────
-function opcionesFamilia(p) {
-    // Se muestra la familia que le toca (la del nombre si no la cambió); elegir otra la fija.
-    const actual = familiaDelProducto(p);
-    const sel = actual ? actual.id : 'otro';
-    return [
-        ...estado.regla.familias.map((f) => `<option value="${f.id}"${sel === f.id ? ' selected' : ''}>${esc(f.nombre)}</option>`),
-        `<option value="otro"${sel === 'otro' ? ' selected' : ''}>Otro (por costo)</option>`,
-    ].join('');
-}
-
 function htmlResultado(p) {
     const r = resultado(p);
     if (!r) return '<p class="falta">Escribe lo que costó.</p>';
-    const tarjeta = estado.regla.tarjeta > 0 && estado.regla.tarjetaOn !== false;
-    const venta = r.soloSuelto ? 'suelto' : 'por docena';
+    const tarjeta = estado.regla.tarjetaOn !== false && estado.regla.tarjeta > 0;
+    const termina8 = !r.porDocena && r.sinRedondear >= estado.regla.terminaEn8Desde && Math.abs(r.sinRedondear - r.suelto) >= 0.5;
     return `
+        <p class="por-que">Costó ${rango(escalonDe(Number(p.costo), estado.regla))}: le sumas <b>${r.porcentaje} %</b>${p.ajuste === 'competencia' ? ' (con competencia)' : p.ajuste === 'rentable' ? ' (rentable)' : ''}</p>
         <div class="precios">
-            ${r.docena != null ? `<div class="precio docena"><span>Docena</span><strong>${soles(r.docena)}</strong><small>${soles(r.docenaUnidad)} c/u</small></div>` : ''}
-            <div class="precio suelto${r.docena == null ? ' solo' : ''}"><span>${r.docena == null ? 'Precio' : 'Suelto'}</span><strong>${soles(r.suelto)}</strong>${r.docena == null ? '<small>se vende suelto</small>' : ''}</div>
+            ${r.porDocena ? `<div class="precio docena"><span>Docena</span><strong>${soles(r.docena)}</strong><small>${soles(r.docenaUnidad)} c/u</small></div>` : ''}
+            <div class="precio suelto${r.porDocena ? '' : ' solo'}"><span>${r.porDocena ? 'Suelto' : 'Precio'}</span><strong>${soles(r.suelto)}</strong>${termina8 ? `<small>en vez de ${soles(r.sinRedondear)}: termina en 8, ya trae su rebaja</small>` : ''}</div>
         </div>
-        <p class="gana">Ganas <b>${soles(r.soloSuelto ? r.ganasSuelto : r.ganas)}</b> c/u ${venta}
+        <p class="gana">Ganas <b>${soles(r.porDocena ? r.ganas : r.ganasSuelto)}</b> c/u${r.porDocena ? ' por docena' : ''}
             · te queda <b>${soles(r.teQueda)}</b>${estado.regla.conFactura ? ' <small>(sin IGV)</small>' : ''}
             ${tarjeta ? `<br><small>Si te paga con tarjeta te queda ${soles(r.conTarjeta)}</small>` : ''}</p>
         ${r.costoConFlete !== Number(p.costo) ? `<p class="con-flete">Con flete te costó ${soles(r.costoConFlete)} c/u</p>` : ''}
@@ -126,9 +140,6 @@ function htmlResultado(p) {
 }
 
 function htmlProducto(p, nuevo) {
-    const r = resultado(p);
-    const fam = familiaDelProducto(p);
-    const pctBase = r ? r.porcentaje : (fam ? fam.docena : '');
     return `
     <li class="producto${nuevo ? ' nuevo' : ''}" data-id="${p.id}">
         <div class="fila-tope">
@@ -138,8 +149,9 @@ function htmlProducto(p, nuevo) {
         <div class="datos">
             <label>Costo c/u<span class="con-sol"><span aria-hidden="true">S/</span><input data-campo="costo" inputmode="decimal" value="${esc(p.costo)}"></span></label>
             <label>Cantidad<input data-campo="cantidad" inputmode="numeric" placeholder="—" value="${p.cantidad ?? ''}"></label>
-            <label>Familia<select data-campo="familiaId">${opcionesFamilia(p)}</select></label>
-            <label>Le sumas<span class="con-sol"><input data-campo="propio" inputmode="decimal" placeholder="${pctBase}" value="${p.propio ?? ''}" aria-label="Porcentaje para este producto"><span aria-hidden="true">%</span></span></label>
+        </div>
+        <div class="ajuste" role="group" aria-label="Cómo es este producto">
+            ${AJUSTES.map((a) => `<button type="button" data-accion="ajuste" data-ajuste="${a.id}" aria-pressed="${(p.ajuste || 'normal') === a.id}">${a.texto}</button>`).join('')}
         </div>
         <div class="resultado">${htmlResultado(p)}</div>
     </li>`;
@@ -153,6 +165,16 @@ function pintarTodo(nuevos = new Set()) {
     $('flete').value = estado.flete || '';
     pintarResumen();
 }
+const repintarResultados = () => document.querySelectorAll('.producto').forEach((li) => {
+    const p = estado.productos.find((x) => x.id === Number(li.dataset.id));
+    if (p) li.querySelector('.resultado').innerHTML = htmlResultado(p);
+});
+
+const ICONOS = {
+    caja: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5M12 13v8"/></svg>',
+    sube: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 7-8.5 8.5-5-5L2 17"/><path d="M16 7h6v6"/></svg>',
+    moneda: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M15 9.5c-.5-1-1.6-1.5-3-1.5-1.7 0-3 .8-3 2s1.3 1.7 3 2 3 .8 3 2-1.3 2-3 2c-1.4 0-2.5-.5-3-1.5M12 6.5V8M12 16v1.5"/></svg>',
+};
 
 function pintarResumen() {
     const ps = estado.productos;
@@ -179,14 +201,14 @@ function pintarResumen() {
         if (!r) continue;
         const n = Number(p.cantidad);
         invertido += r.costoConFlete * n;
-        ganas += (r.soloSuelto ? r.ganasSuelto : r.ganas) * n;
+        ganas += (r.porDocena ? r.ganas : r.ganasSuelto) * n;
         queda += r.teQueda * n;
     }
     t.hidden = false;
     t.innerHTML = `
-        <div class="cifra neutro"><span class="icono" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5M12 13v8"/></svg></span><div><span>Invertiste</span><strong>${soles(invertido)}</strong></div></div>
-        <div class="cifra ok"><span class="icono" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 7-8.5 8.5-5-5L2 17"/><path d="M16 7h6v6"/></svg></span><div><span>Si vendes todo, ganas</span><strong>${soles(ganas)}</strong></div></div>
-        <div class="cifra ok"><span class="icono" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M15 9.5c-.5-1-1.6-1.5-3-1.5-1.7 0-3 .8-3 2s1.3 1.7 3 2 3 .8 3 2-1.3 2-3 2c-1.4 0-2.5-.5-3-1.5M12 6.5V8M12 16v1.5"/></svg></span><div><span>Te queda${estado.regla.conFactura ? ' (sin IGV)' : ''}</span><strong>${soles(queda)}</strong></div></div>`;
+        <div class="cifra neutro"><span class="icono" aria-hidden="true">${ICONOS.caja}</span><div><span>Invertiste</span><strong>${soles(invertido)}</strong></div></div>
+        <div class="cifra ok"><span class="icono" aria-hidden="true">${ICONOS.sube}</span><div><span>Si vendes todo, ganas</span><strong>${soles(ganas)}</strong></div></div>
+        <div class="cifra ok"><span class="icono" aria-hidden="true">${ICONOS.moneda}</span><div><span>Te queda${estado.regla.conFactura ? ' (sin IGV)' : ''}</span><strong>${soles(queda)}</strong></div></div>`;
 }
 
 // Escribir en una tarjeta: solo se repinta su resultado (no se pierde el cursor).
@@ -200,28 +222,11 @@ $('lista').addEventListener('input', (e) => {
     if (campo === 'nombre') p.nombre = v;
     else if (campo === 'costo') p.costo = num(v);
     else if (campo === 'cantidad') p.cantidad = num(v) || null;
-    else if (campo === 'propio') p.propio = v.trim() === '' ? null : num(v);
-    else if (campo === 'familiaId') p.familiaId = v;
     guardar();
-    if (campo === 'cantidad' && num(estado.flete) > 0) {
-        // Cambia el reparto del flete de todos.
-        document.querySelectorAll('.producto').forEach((otro) => {
-            const q = estado.productos.find((x) => x.id === Number(otro.dataset.id));
-            if (q) otro.querySelector('.resultado').innerHTML = htmlResultado(q);
-        });
-    } else {
-        li.querySelector('.resultado').innerHTML = htmlResultado(p);
-    }
-    if (campo === 'nombre' || campo === 'familiaId') {
-        const sel = li.querySelector('select');
-        if (campo === 'nombre') sel.innerHTML = opcionesFamilia(p);
-        const r = resultado(p);
-        if (r) li.querySelector('[data-campo="propio"]').placeholder = r.porcentaje;
-    }
+    if (campo === 'cantidad' && num(estado.flete) > 0) repintarResultados();
+    else if (campo !== 'nombre') li.querySelector('.resultado').innerHTML = htmlResultado(p);
     pintarResumen();
 });
-// El select dispara «change», no siempre «input».
-$('lista').addEventListener('change', (e) => { if (e.target.tagName === 'SELECT') e.target.dispatchEvent(new Event('input', { bubbles: true })); });
 
 $('lista').addEventListener('click', async (e) => {
     const b = e.target.closest('[data-accion]');
@@ -235,6 +240,13 @@ $('lista').addEventListener('click', async (e) => {
         guardar(); pintarTodo();
         avisar(`Quitaste «${p.nombre}».`, () => { estado.productos = antes; guardar(); pintarTodo(); });
     }
+    if (b.dataset.accion === 'ajuste') {
+        p.ajuste = b.dataset.ajuste;
+        guardar();
+        li.querySelectorAll('[data-accion="ajuste"]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+        li.querySelector('.resultado').innerHTML = htmlResultado(p);
+        pintarResumen();
+    }
     if (b.dataset.accion === 'clave') {
         const r = resultado(p);
         if (r) { await copiarTexto(clave(p.costo, r.porcentaje)); avisar('Clave copiada.'); }
@@ -243,22 +255,16 @@ $('lista').addEventListener('click', async (e) => {
 
 $('flete').addEventListener('input', (e) => {
     estado.flete = e.target.value;
-    guardar();
-    document.querySelectorAll('.producto').forEach((li) => {
-        const p = estado.productos.find((x) => x.id === Number(li.dataset.id));
-        if (p) li.querySelector('.resultado').innerHTML = htmlResultado(p);
-    });
-    pintarResumen();
+    guardar(); repintarResultados(); pintarResumen();
 });
 
 // ── Copiar, imprimir, empezar otra ─────────────────────────────────────────
 async function copiarTexto(t) {
-    try { await navigator.clipboard.writeText(t); return true; } catch {
+    try { await navigator.clipboard.writeText(t); } catch {
         const a = document.createElement('textarea');
         a.value = t; document.body.append(a); a.select();
         try { document.execCommand('copy'); } catch { /* nada */ }
         a.remove();
-        return true;
     }
 }
 $('copiar-todo').addEventListener('click', async () => {
@@ -292,21 +298,42 @@ dPegar.addEventListener('close', () => {
     if (l.length) { agregar(l); avisar(`Agregaste ${l.length} ${l.length === 1 ? 'producto' : 'productos'}.`); }
 });
 
-// ── Tu regla ───────────────────────────────────────────────────────────────
+// ── Tu regla (con ejemplos que se actualizan solos) ────────────────────────
 const dRegla = $('dialogo-regla');
+function pintarEscalera() {
+    const R = estado.regla;
+    $('regla-escalera').innerHTML = R.escalera.map((e, i) => {
+        const c = costoDeEjemplo(i);
+        const r = calcular({ costo: c }, R);
+        return `
+        <div class="escalon">
+            <div class="escalon-tope">
+                <span>Si costó <b>${rango(i)}</b></span>
+                <span class="con-sol mini"><span aria-hidden="true">+</span><input data-e="${i}" inputmode="decimal" value="${e.pct}" aria-label="Le sumas, si costó ${rango(i)}"><span aria-hidden="true">%</span></span>
+            </div>
+            <p class="ejemplo">Ej.: si te costó ${soles(c)} → ${precioCorto(r)}</p>
+        </div>`;
+    }).join('');
+}
+function pintarEjemplos() {
+    const R = estado.regla;
+    const barato = calcular({ costo: 3 }, R);
+    $('ej-docena').innerHTML = barato.porDocena
+        ? `Ej.: costó ${soles(3)} → la docena a ${soles(barato.docena)} (${soles(barato.docenaUnidad)} c/u) y suelto ${soles(barato.suelto)}.`
+        : 'Con S/ 0 nada se vende por docena.';
+    $('ej-redondeo').innerHTML = `Ej.: ${soles(4.36)} → <b>${soles(redondearPrecio(4.36, R))}</b> · ${soles(64.7)} → <b>${soles(redondearPrecio(64.7, R))}</b> · ${soles(200)} → <b>${soles(redondearPrecio(200, R))}</b> <small>(en vez de 200: ya trae su rebaja y no se rebaja más)</small>`;
+    const n = calcular({ costo: 12 }, R), c = calcular({ costo: 12, ajuste: 'competencia' }, R), r = calcular({ costo: 12, ajuste: 'rentable' }, R);
+    $('ej-ajuste').innerHTML = `Ej.: costó ${soles(12)} → normal ${soles(n.docenaUnidad ?? n.suelto)}, con competencia ${soles(c.docenaUnidad ?? c.suelto)}, rentable ${soles(r.docenaUnidad ?? r.suelto)} c/u. Se elige en cada producto, con un toque.`;
+}
 function pintarRegla() {
     const R = estado.regla;
-    $('regla-familias').innerHTML = R.familias.map((f, i) => `
-        <tr><th scope="row">${esc(f.nombre)}${f.soloSuelto ? ' <small>(se vende suelto)</small>' : ''}</th>
-            <td><span class="con-sol mini"><input data-f="${i}" data-k="docena" inputmode="decimal" value="${f.docena}" aria-label="${esc(f.nombre)}: le sumas"><span aria-hidden="true">%</span></span></td>
-            <td>${f.soloSuelto ? '—' : `<span class="con-sol mini"><input data-f="${i}" data-k="suelto" inputmode="decimal" value="${f.suelto}" aria-label="${esc(f.nombre)}: suelto, más"><span aria-hidden="true">%</span></span>`}</td></tr>`).join('');
-    let desde = 0;
-    $('regla-escalera').innerHTML = R.escalera.map((e, i) => {
-        const fila = `<tr><th scope="row">${e.hasta == null ? `S/ ${desde} o más` : `${desde ? `S/ ${desde} a` : 'Menos de'} S/ ${e.hasta}`}</th>
-            <td><span class="con-sol mini"><input data-e="${i}" inputmode="decimal" value="${e.docena}" aria-label="Le sumas"><span aria-hidden="true">%</span></span></td></tr>`;
-        desde = e.hasta ?? desde;
-        return fila;
-    }).join('');
+    pintarEscalera(); pintarEjemplos();
+    $('regla-docena').value = R.docenaHasta;
+    $('regla-suelto').value = R.recargoSuelto;
+    $('regla-al-sol').value = R.redondeoAlSolDesde;
+    $('regla-en-8').value = R.terminaEn8Desde;
+    $('regla-competencia').value = R.ajustes.competencia;
+    $('regla-rentable').value = R.ajustes.rentable;
     $('regla-factura').checked = R.conFactura;
     $('regla-tarjeta-on').checked = R.tarjetaOn !== false && R.tarjeta > 0;
     $('regla-tarjeta').value = R.tarjeta;
@@ -314,18 +341,29 @@ function pintarRegla() {
 $('abrir-regla').addEventListener('click', () => { pintarRegla(); dRegla.showModal(); });
 dRegla.addEventListener('input', (e) => {
     const t = e.target, R = estado.regla;
-    if (t.dataset.f != null) R.familias[Number(t.dataset.f)][t.dataset.k] = num(t.value);
-    else if (t.dataset.e != null) R.escalera[Number(t.dataset.e)].docena = num(t.value);
+    if (t.dataset.e != null) R.escalera[Number(t.dataset.e)].pct = num(t.value);
+    else if (t.id === 'regla-docena') R.docenaHasta = num(t.value);
+    else if (t.id === 'regla-suelto') R.recargoSuelto = num(t.value);
+    else if (t.id === 'regla-al-sol') R.redondeoAlSolDesde = num(t.value);
+    else if (t.id === 'regla-en-8') R.terminaEn8Desde = num(t.value) || 1e9;
+    else if (t.id === 'regla-competencia') R.ajustes.competencia = num(t.value);
+    else if (t.id === 'regla-rentable') R.ajustes.rentable = num(t.value);
     else if (t.id === 'regla-factura') R.conFactura = t.checked;
     else if (t.id === 'regla-tarjeta-on') R.tarjetaOn = t.checked;
     else if (t.id === 'regla-tarjeta') R.tarjeta = num(t.value);
-    guardar(); pintarTodo(); vistaPrevia();
+    guardar();
+    // Los ejemplos se actualizan sin repintar los campos (no se pierde el cursor).
+    document.querySelectorAll('#regla-escalera .escalon .ejemplo').forEach((p, i) => {
+        const c = costoDeEjemplo(i);
+        p.innerHTML = `Ej.: si te costó ${soles(c)} → ${precioCorto(calcular({ costo: c }, R))}`;
+    });
+    pintarEjemplos(); repintarResultados(); pintarResumen(); vistaPrevia();
 });
 $('regla-reiniciar').addEventListener('click', () => {
     const antes = copia(estado.regla);
     estado.regla = copia(REGLA_INICIAL);
-    guardar(); pintarRegla(); pintarTodo(); vistaPrevia();
-    avisar('Volviste a la regla del cuaderno.', () => { estado.regla = antes; guardar(); pintarRegla(); pintarTodo(); });
+    guardar(); pintarRegla(); repintarResultados(); pintarResumen(); vistaPrevia();
+    avisar('Volviste a la regla de siempre.', () => { estado.regla = antes; guardar(); pintarRegla(); repintarResultados(); pintarResumen(); });
 });
 
 pintarTodo();

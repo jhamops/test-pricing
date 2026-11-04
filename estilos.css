@@ -301,3 +301,32 @@ textarea {
 .totales .destacado strong { color: var(--tinte); }
 .boton-principal { box-shadow: none; border-radius: 12px; }
 .marca strong { font-weight: 800; }
+
+/* ── Regla general (sin productos ni familias) ── */
+.datos { grid-template-columns: 1fr 1fr; }
+.ajuste { display: flex; flex-wrap: wrap; gap: 6px; }
+.ajuste button {
+    min-height: 40px; padding: 0 12px; border-radius: 999px; font-weight: 700; font-size: .88rem;
+    border: 1px solid var(--borde); background: var(--superficie); color: var(--texto-2);
+}
+.ajuste button[aria-pressed="true"] { border-color: var(--marca); background: var(--marca-suave); color: var(--texto); font-weight: 800; }
+.por-que { margin: 0; color: var(--texto-2); font-weight: 600; font-size: .92rem; }
+.por-que b { color: var(--texto); }
+.precio.solo small { font-weight: 600; font-size: .85rem; }
+.paso {
+    display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; margin-right: 6px;
+    background: var(--marca-suave); color: var(--marca); font-size: .85rem; font-weight: 900;
+}
+.ayuda.chico { font-size: .9rem; margin: 0 0 8px; }
+.escalones { display: flex; flex-direction: column; gap: 8px; }
+.escalon {
+    padding: 10px 12px; border-radius: 14px;
+    background: linear-gradient(100deg, color-mix(in srgb, var(--marca) 10%, var(--superficie)) 0%, var(--superficie) 62%);
+    border: 1px solid color-mix(in srgb, var(--marca) 18%, var(--borde));
+}
+.escalon-tope { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+.ejemplo { margin: 6px 0 0; color: var(--texto-2); font-size: .92rem; }
+.ejemplo b { color: var(--ok); }
+.ejemplo small { color: var(--texto-3); }
+.linea-regla { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; line-height: 1.6; }
+.con-sol.mini > span:first-child:not(:only-child) { margin-right: 2px; }
