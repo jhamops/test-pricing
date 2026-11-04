@@ -3,11 +3,12 @@
 Escribe lo que te costó y te dice a cuánto venderlo **por docena** y **suelto**, cuánto ganas,
 cuánto te queda después del IGV y la **clave del cuaderno** (`mes costo año %`, p. ej. `03 10 26 50`).
 
-- **Una sola regla general**, no producto por producto:
-  1. cuánto le sumas según lo que costó (a lo barato más %, a lo caro menos);
-  2. lo barato se vende por docena y suelto, lo caro con un solo precio;
-  3. redondeo según el precio: 10 céntimos, al sol, y lo caro **termina en 8** (98 y no 100: ya trae su rebaja);
-  4. por producto, con un toque: normal, mucha competencia (menos %) o rentable (más %).
+- **Como trabaja ella:** precio de compra → tarjeta → flete → **toca el porcentaje** (de 5 en 5,
+  de 15 a 85, o «Otro» con cualquiera) y el precio cambia al momento. La cantidad es opcional.
+- El botón con borde punteado es el **sugerido** para ese costo (la escalera de «Tu regla»,
+  ajustada con sus 38 precios reales); ella toca el que quiera, también en cada producto de la lista.
+- Lo barato sale por docena y suelto (opcional); lo caro termina en 8 (opcional: 98 y no 100).
+- **La tarjeta (3 %) va siempre dentro del precio** (se divide entre 0.97); el flete se suma sin ganancia encima.
 - Uno por uno (Enter y sigues) o **varios pegados** de una factura, lista o WhatsApp.
 - **Flete**: el de un producto (entre sus unidades) o el de toda la compra (repartido).
 - **La comisión de tarjeta (3 %) va siempre dentro del precio**, pague como pague: se divide entre 0.97.

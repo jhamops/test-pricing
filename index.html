@@ -33,24 +33,35 @@
             <div class="entrada-tope">
                 <span class="icono" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M8 6h8M8 10h.01M12 10h.01M16 10h.01M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h4"/></svg></span>
                 <div>
-                    <h1 id="titulo-entrada">¿Cuánto te costó?</h1>
-                    <p class="ayuda">Escribe el costo y te digo a cuánto venderlo. <b>Enter</b> y sigues con el siguiente. El flete y la tarjeta ya van incluidos.</p>
+                    <h1 id="titulo-entrada">¿A cuánto lo vendo?</h1>
+                    <p class="ayuda">Pon el precio de compra y toca cuánto le sumas: el precio cambia al momento. La tarjeta y el flete ya van incluidos.</p>
                 </div>
             </div>
             <form id="form-nuevo" autocomplete="off">
                 <label class="campo campo-nombre">Producto
                     <input id="nuevo-nombre" placeholder="Ej.: Pelota de vóley" enterkeyhint="next">
                 </label>
-                <label class="campo campo-costo">Costo c/u
-                    <span class="con-sol"><span aria-hidden="true">S/</span><input id="nuevo-costo" inputmode="decimal" placeholder="0.00" enterkeyhint="done" required></span>
-                </label>
-                <label class="campo campo-cant">Cantidad
-                    <input id="nuevo-cant" inputmode="numeric" placeholder="opcional" enterkeyhint="done">
-                </label>
-                <label class="campo campo-flete">Flete
-                    <span class="con-sol"><span aria-hidden="true">S/</span><input id="nuevo-flete" inputmode="decimal" placeholder="opcional" enterkeyhint="done" aria-label="Flete que pagaste por este producto (todo)"></span>
-                </label>
-                <button type="submit" class="boton-principal" id="agregar">+ Agregar</button>
+                <div class="fila-costos">
+                    <label class="campo campo-costo">Precio de compra
+                        <span class="con-sol"><span aria-hidden="true">S/</span><input id="nuevo-costo" inputmode="decimal" placeholder="0.00" enterkeyhint="done" required></span>
+                    </label>
+                    <label class="campo campo-tarjeta">Tarjeta
+                        <span class="con-sol"><input id="nuevo-tarjeta" inputmode="decimal" aria-label="Comisión de la tarjeta (POS), en por ciento"><span aria-hidden="true">%</span></span>
+                    </label>
+                    <label class="campo campo-flete">Flete
+                        <span class="con-sol"><span aria-hidden="true">S/</span><input id="nuevo-flete" inputmode="decimal" placeholder="0.00" enterkeyhint="done" aria-label="Flete que pagaste por este producto"></span>
+                    </label>
+                </div>
+                <div class="porcentajes" role="group" aria-labelledby="titulo-pct">
+                    <p class="porcentajes-titulo" id="titulo-pct">¿Cuánto le sumas? <small id="nuevo-sugerido"></small></p>
+                    <div class="chips" id="nuevo-pct"></div>
+                </div>
+                <div class="fila-final">
+                    <label class="cant-chica">Cantidad <small>(opcional)</small>
+                        <input id="nuevo-cant" inputmode="numeric" placeholder="—" enterkeyhint="done">
+                    </label>
+                    <button type="submit" class="boton-principal" id="agregar">+ Agregar a la lista</button>
+                </div>
             </form>
             <div id="vista-previa" class="vista-previa" aria-live="polite"></div>
             <div class="mas-formas">
@@ -95,8 +106,8 @@
             <div class="dialogo-cuerpo">
                 <p class="ayuda">Una sola regla para todo lo que vendes. Cámbiala cuando quieras: se guarda en este equipo y los ejemplos se actualizan solos.</p>
 
-                <h3><span class="paso">1</span> Cuánto le sumas, según lo que te costó</h3>
-                <p class="ayuda chico">A lo barato le sumas más (si no, no ganas nada en soles); a lo caro, menos (ya ganas bastante en soles).</p>
+                <h3><span class="paso">1</span> El porcentaje sugerido, según lo que te costó</h3>
+                <p class="ayuda chico">Es el botón que aparece marcado al poner el precio de compra. Tú tocas el que quieras: a lo barato se le suma más (si no, no ganas nada en soles); a lo caro, menos.</p>
                 <div class="escalones" id="regla-escalera"></div>
 
                 <h3><span class="paso">2</span> Docena y suelto</h3>
@@ -122,16 +133,7 @@
                 </div>
                 <p class="ejemplo" id="ej-redondeo"></p>
 
-                <h3><span class="paso">4</span> Cuando un producto es distinto</h3>
-                <div class="linea-regla">
-                    <span>Con <b>mucha competencia</b>, le sumas</span>
-                    <span class="con-sol mini"><input id="regla-competencia" inputmode="numeric" aria-label="Puntos con mucha competencia"><span aria-hidden="true">pts</span></span>
-                    <span>; si es <b>rentable</b> (poca competencia, se vende solo),</span>
-                    <span class="con-sol mini"><input id="regla-rentable" inputmode="numeric" aria-label="Puntos si es rentable"><span aria-hidden="true">pts</span></span>
-                </div>
-                <p class="ejemplo" id="ej-ajuste"></p>
-
-                <h3><span class="paso">5</span> Cómo compras y cobras</h3>
+                <h3><span class="paso">4</span> Cómo compras y cobras</h3>
                 <label class="interruptor"><input type="checkbox" id="regla-factura"> Compro con factura y pago IGV <small>(«te queda» descuenta el IGV)</small></label>
                 <label class="interruptor"><input type="checkbox" id="regla-tarjeta-siempre"> La comisión de tarjeta va <b>siempre</b> en el precio: <span class="con-sol mini"><input id="regla-tarjeta" inputmode="decimal" aria-label="Porcentaje del POS"><span aria-hidden="true">%</span></span></label>
                 <p class="ejemplo">Se pague con lo que se pague: el precio se divide entre (1 − ese %): con 3 %, entre 0.97 (no se suma 3 %). Así, después de la comisión te queda exacto lo que querías ganar.</p>

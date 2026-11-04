@@ -18,12 +18,13 @@ export const REGLA_INICIAL = {
     // Si costó menos que `hasta`, le sumas `pct` % de GANANCIA. El último no tiene tope.
     // (La comisión de tarjeta va aparte y siempre: ver `tarjeta`.)
     escalera: [
-        // Ajustados con sus 38 precios reales (`precios-reales.js`): error medio 4.8 %.
-        { hasta: 5, pct: 58 },
-        { hasta: 20, pct: 38 },
-        { hasta: 60, pct: 52 },
-        { hasta: 150, pct: 38 },
-        { hasta: null, pct: 31 },
+        // De 5 en 5 (los botones que ella toca), ajustados con sus 38 precios reales
+        // (`precios-reales.js`): error medio 5.1 %. Es solo el SUGERIDO: ella elige.
+        { hasta: 5, pct: 60 },
+        { hasta: 20, pct: 40 },
+        { hasta: 60, pct: 50 },
+        { hasta: 150, pct: 40 },
+        { hasta: null, pct: 25 },
     ],
     porDocenaOn: true, // ¿se saca precio por docena? (opcional)
     docenaHasta: 18, // lo que cuesta menos que esto se vende por docena y suelto
@@ -38,6 +39,9 @@ export const REGLA_INICIAL = {
     tarjeta: 3,
     tarjetaSiempre: true,
 };
+
+/** Los porcentajes que se tocan: de 5 en 5, de 15 a 85 (y aparte, cualquiera). */
+export const PORCENTAJES = Array.from({ length: 15 }, (_, i) => 15 + i * 5);
 
 const r2 = (n) => Math.round(n * 100) / 100;
 /** Al múltiplo más cercano (0.10, 0.50, 1). */
@@ -74,12 +78,13 @@ export function porcentajeDe(costo, regla, ajuste = 'normal') {
  * Todo lo de un producto. `costo` es por unidad (con IGV si compró con factura);
  * `flete` es lo que le toca de flete a cada unidad.
  */
-export function calcular({ costo, flete = 0, ajuste = 'normal' }, regla) {
+export function calcular({ costo, flete = 0, ajuste = 'normal', pct: elegido = null }, regla) {
     const c = Number(costo);
     if (!(c > 0)) return null;
     const f = Number(flete) || 0;
     const base = r2(c + f);
-    const pct = porcentajeDe(c, regla, ajuste);
+    // El que eligió (tocando un botón o escribiéndolo) manda; si no, el sugerido.
+    const pct = elegido != null && elegido !== '' && Number.isFinite(Number(elegido)) ? Number(elegido) : porcentajeDe(c, regla, ajuste);
     const comisionPct = (Number(regla.tarjeta) || 0) / 100;
     const t = regla.tarjetaSiempre === false ? 0 : comisionPct;
     // Costo + ganancia; el flete se suma tal cual (no se le gana encima, como en su

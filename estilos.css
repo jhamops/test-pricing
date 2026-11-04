@@ -334,3 +334,43 @@ textarea {
 .datos { grid-template-columns: 1.2fr .9fr 1fr; }
 
 .flete-mini { flex-basis: 100%; color: var(--aviso-tinta); font-weight: 800; font-size: .9rem; }
+
+/* ── Precio de compra · tarjeta · flete · porcentajes (cómo trabaja ella) ── */
+#form-nuevo { display: flex; flex-direction: column; align-items: stretch; gap: 12px; }
+.fila-costos { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, .8fr) minmax(0, 1fr); gap: 10px; }
+@media (max-width: 520px) {
+    .fila-costos { grid-template-columns: 1fr 1fr; }
+    .fila-costos .campo-costo { grid-column: 1 / -1; }
+}
+.campo-tarjeta .con-sol > span:last-child, .pct-otro span:last-child { color: var(--texto-2); }
+.porcentajes-titulo { margin: 0 0 6px; font-weight: 800; font-size: .95rem; color: var(--texto); }
+.porcentajes-titulo small { margin-left: 6px; color: var(--texto-2); font-weight: 600; }
+.chips { display: grid; grid-template-columns: repeat(auto-fill, minmax(52px, 1fr)); gap: 6px; }
+.pct {
+    min-height: 44px; border-radius: 12px; border: 1px solid var(--borde); background: var(--superficie);
+    font-weight: 800; font-size: 1rem; color: var(--texto); font-variant-numeric: tabular-nums;
+}
+.pct::after { content: '%'; font-size: .75em; font-weight: 700; margin-left: 1px; opacity: .7; }
+.pct.sugerido { border: 2px dashed var(--marca); }
+.pct[aria-pressed="true"] { background: var(--marca); border: 2px solid var(--marca); color: var(--sobre-marca); }
+.pct-otro {
+    grid-column: span 2; display: flex; align-items: center; gap: 4px; min-height: 44px; padding: 0 10px;
+    border-radius: 12px; border: 1px solid var(--borde); background: var(--superficie); font-weight: 800; font-size: .9rem; color: var(--texto-2);
+}
+.pct-otro input { width: 100%; min-width: 0; border: 0; outline: 0; background: transparent; font: inherit; font-size: 1rem; color: var(--texto); text-align: right; }
+.pct-otro.activo { border: 2px solid var(--marca); color: var(--texto); background: var(--marca-suave); }
+.chips.chico { grid-template-columns: repeat(auto-fill, minmax(46px, 1fr)); gap: 5px; }
+.chips.chico .pct { min-height: 40px; font-size: .92rem; border-radius: 10px; }
+.chips.chico .pct-otro { min-height: 40px; border-radius: 10px; }
+.fila-final { display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap; }
+.fila-final .boton-principal { flex: 1 1 220px; }
+.cant-chica { display: flex; align-items: center; gap: 8px; color: var(--texto-3); font-weight: 700; font-size: .85rem; }
+.cant-chica small { font-weight: 600; }
+.cant-chica input {
+    width: 76px; min-height: 40px; border-radius: 10px; border: 1px solid var(--borde); background: var(--elevado);
+    font: inherit; font-size: .95rem; color: var(--texto); padding: 0 8px;
+}
+.vista-previa .grande { font-size: 1.1rem; }
+.vista-previa .grande b { font-size: 1.45rem; }
+.datos { grid-template-columns: 1.3fr 1fr; }
+.antes-red { color: var(--texto-2); font-weight: 600; font-size: .9rem; }

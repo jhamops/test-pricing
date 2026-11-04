@@ -1,22 +1,22 @@
 // node --test   (sin dependencias)
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { REGLA_INICIAL as R, calcular, clave, escalonDe, fleteDelProducto, fletePorUnidad, leerPegado, porcentajeDe, redondearPrecio, terminadoEn8, textoParaCopiar } from './precios.js';
+import { PORCENTAJES, REGLA_INICIAL as R, calcular, clave, escalonDe, fleteDelProducto, fletePorUnidad, leerPegado, porcentajeDe, redondearPrecio, terminadoEn8, textoParaCopiar } from './precios.js';
 const SIN_TARJETA = { ...R, tarjetaSiempre: false };
 import { DOCENA, SUELTO } from './precios-reales.js';
 
 test('lo barato lleva más porcentaje y lo caro menos (la escalera)', () => {
-    assert.equal(porcentajeDe(3, R), 58);
-    assert.equal(porcentajeDe(12, R), 38);
-    assert.equal(porcentajeDe(40, R), 52);
-    assert.equal(porcentajeDe(100, R), 38);
-    assert.equal(porcentajeDe(200, R), 31);
+    assert.equal(porcentajeDe(3, R), 60);
+    assert.equal(porcentajeDe(12, R), 40);
+    assert.equal(porcentajeDe(40, R), 50);
+    assert.equal(porcentajeDe(100, R), 40);
+    assert.equal(porcentajeDe(200, R), 25);
     assert.equal(escalonDe(5, R), 1, 'el borde es del escalón siguiente');
 });
 
 test('competencia resta y rentable suma', () => {
-    assert.equal(porcentajeDe(12, R, 'competencia'), 28);
-    assert.equal(porcentajeDe(12, R, 'rentable'), 53);
+    assert.equal(porcentajeDe(12, R, 'competencia'), 30);
+    assert.equal(porcentajeDe(12, R, 'rentable'), 55);
 });
 
 test('terminado en 8: el más cercano (ya trae su rebaja)', () => {
@@ -36,21 +36,21 @@ test('el redondeo depende del precio', () => {
 test('lo barato sale por docena y suelto; lo caro, un solo precio', () => {
     const r = calcular({ costo: 3 }, SIN_TARJETA);
     assert.equal(r.porDocena, true);
-    assert.equal(r.docenaUnidad, 4.7); // 3 + 58 % = 4.74
-    assert.equal(r.docena, 56.4);
-    assert.equal(r.suelto, 5.5); // 4.70 + 15 % = 5.41 → 5.50
+    assert.equal(r.docenaUnidad, 4.8); // 3 + 60 %
+    assert.equal(r.docena, 57.6);
+    assert.equal(r.suelto, 5.5); // 4.80 + 15 % = 5.52 → 5.50
     const caro = calcular({ costo: 160 }, SIN_TARJETA);
     assert.equal(caro.porDocena, false);
     assert.equal(caro.docena, null);
-    assert.equal(caro.suelto, 208); // 160 + 31 % = 209.60 → el terminado en 8 más cercano
+    assert.equal(caro.suelto, 198); // 160 + 25 % = 200 → el terminado en 8 más cercano
 });
 
 test('la comisión de tarjeta va siempre dentro del precio (dividiendo, no sumando)', () => {
     const sin = calcular({ costo: 100 }, { ...SIN_TARJETA, terminaEn8Desde: 1e9 });
     const con = calcular({ costo: 100 }, { ...R, terminaEn8Desde: 1e9 });
-    assert.equal(sin.sinRedondear, 138);
-    assert.equal(con.sinRedondear, 142.27); // 138 / 0.97
-    assert.equal(con.comision, 4.26); // 3 % de 142
+    assert.equal(sin.sinRedondear, 140);
+    assert.equal(con.sinRedondear, 144.33); // 140 / 0.97
+    assert.equal(con.comision, 4.32); // 3 % de 144
     // Lo que gana es lo mismo que sin tarjeta, ya descontada la comisión (± el redondeo).
     assert.ok(Math.abs(con.ganas - sin.ganas) < 1, `${con.ganas} vs ${sin.ganas}`);
     // Si le pagan en efectivo, le queda la comisión de más.
@@ -66,20 +66,20 @@ test('sus 38 precios reales: la regla general se equivoca poco (y avisa si empeo
     });
     const medio = errores.reduce((a, b) => a + b, 0) / errores.length;
     assert.equal(datos.length, 38);
-    assert.ok(medio <= 0.05, `error medio ${(medio * 100).toFixed(1)} %`);
+    assert.ok(medio <= 0.055, `error medio ${(medio * 100).toFixed(1)} %`);
     assert.ok(errores.filter((e) => e <= 0.08).length >= 29, 'al menos 29 de 38 a menos de 8 %');
     assert.ok(Math.max(...errores) <= 0.14, `el peor, ${(Math.max(...errores) * 100).toFixed(1)} %`);
 });
 
 test('lo que le queda: con factura se descuenta el IGV (y la comisión)', () => {
     const r = calcular({ costo: 160 }, SIN_TARJETA);
-    assert.equal(r.ganas, 48);
-    assert.equal(r.teQueda, 40.68); // 48 / 1.18
-    assert.equal(calcular({ costo: 160 }, { ...SIN_TARJETA, conFactura: false }).teQueda, 48);
-    const conTarjeta = calcular({ costo: 160 }, R); // 160 × 1.31 / 0.97 = 216.08 → 218
-    assert.equal(conTarjeta.suelto, 218);
-    assert.equal(conTarjeta.comision, 6.54);
-    assert.equal(conTarjeta.teQueda, 42.61); // 58 / 1.18 − 6.54
+    assert.equal(r.ganas, 38);
+    assert.equal(r.teQueda, 32.2); // 38 / 1.18
+    assert.equal(calcular({ costo: 160 }, { ...SIN_TARJETA, conFactura: false }).teQueda, 38);
+    const conTarjeta = calcular({ costo: 160 }, R); // 160 × 1.25 / 0.97 = 206.19 → 208
+    assert.equal(conTarjeta.suelto, 208);
+    assert.equal(conTarjeta.comision, 6.24);
+    assert.equal(conTarjeta.teQueda, 34.44); // 48 / 1.18 − 6.24
 });
 
 test('el flete se reparte entre las unidades y sube el precio', () => {
@@ -114,7 +114,7 @@ test('texto para copiar', () => {
         { nombre: 'Cono', costo: 3, r: calcular({ costo: 3 }, SIN_TARJETA) },
         { nombre: 'Guitarra', costo: 160, r: calcular({ costo: 160 }, SIN_TARJETA) },
     ], marzo);
-    assert.equal(t, 'Cono · docena S/ 56.40 (S/ 4.70 c/u) · suelto S/ 5.50 · clave 03 3 26 58\nGuitarra · precio S/ 208.00 · clave 03 160 26 31');
+    assert.equal(t, 'Cono · docena S/ 57.60 (S/ 4.80 c/u) · suelto S/ 5.50 · clave 03 3 26 60\nGuitarra · precio S/ 198.00 · clave 03 160 26 25');
 });
 
 test('el flete se suma tal cual, sin ganancia encima (su ejemplo: 100 + 30 % + 2 = 132)', () => {
@@ -134,5 +134,15 @@ test('sacar precio por docena es opcional', () => {
     const sinDocena = calcular({ costo: 3 }, { ...R, porDocenaOn: false });
     assert.equal(sinDocena.porDocena, false);
     assert.equal(sinDocena.docena, null);
-    assert.equal(sinDocena.suelto, 4.9); // 3 × 1.58 / 0.97 = 4.89 → un solo precio
+    assert.equal(sinDocena.suelto, 4.9); // 3 × 1.60 / 0.97 = 4.95 → un solo precio
+});
+
+test('el porcentaje que ella toca manda (de 5 en 5, o cualquiera)', () => {
+    assert.deepEqual([PORCENTAJES.length, PORCENTAJES[0], PORCENTAJES.at(-1)], [15, 15, 85]);
+    // Su caso: costó 73, le pone 50 % → 110 (sin la tarjeta ni el 8, como su cuaderno).
+    const suya = { ...SIN_TARJETA, terminaEn8On: false };
+    assert.equal(calcular({ costo: 73, pct: 50 }, suya).suelto, 110);
+    assert.equal(calcular({ costo: 73, pct: 50 }, suya).porcentaje, 50);
+    assert.equal(calcular({ costo: 73, pct: 37 }, suya).porcentaje, 37); // uno aparte, cualquiera
+    assert.equal(calcular({ costo: 73, pct: null }, suya).porcentaje, 40); // sin elegir: el sugerido
 });
