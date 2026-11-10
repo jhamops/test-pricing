@@ -7,7 +7,7 @@
  * repartido a la vista, y sale a Excel.
  */
 import {
-    PORCENTAJES, REGLA_INICIAL, calcular, clave, filasExcel, fleteDe as fleteDeCalc, fleteDelProducto, fletePorUnidad,
+    PORCENTAJES, REGLA_INICIAL, calcular, filasExcel, fleteDe as fleteDeCalc, fleteDelProducto, fletePorUnidad,
     leerLista, redondearPrecio, textoParaCopiar,
 } from './precios.js';
 
@@ -150,13 +150,13 @@ function agregar(lista) {
 // ── La lista (tabla) ───────────────────────────────────────────────────────
 function celdasCalculadas(p) {
     const r = resultado(p);
-    if (!r) return { compra: '', precio: '<span class="falta">—</span>', ganas: '', clave: '' };
+    if (!r) return { compra: '', precio: '<span class="falta">—</span>', ganas: '' };
     const conFlete = r.costoConFlete !== Number(p.costo) ? `<small>con flete ${soles(r.costoConFlete)}</small>` : '';
     const precio = r.porDocena
         ? `<b>${soles(r.docenaUnidad)}</b><small>docena · suelto ${soles(r.suelto)}</small>`
         : `<b>${soles(r.suelto)}</b>${Math.abs(r.sinRedondear - r.suelto) >= 0.5 ? `<small>antes ${soles(r.sinRedondear)}</small>` : ''}`;
     const ganas = `<b>${soles(r.porDocena ? r.ganas : r.ganasSuelto)}</b><small>${estado.regla.conFactura ? 'sin IGV ' : 'neto '}${soles(r.teQueda)}</small>`;
-    return { compra: conFlete, precio, ganas, clave: `<button type="button" class="clave" data-accion="clave" title="Copiar">${esc(clave(p.costo, r.porcentaje))}</button>` };
+    return { compra: conFlete, precio, ganas };
 }
 
 function htmlFila(p, nuevo) {
@@ -178,7 +178,7 @@ function htmlFila(p, nuevo) {
         ${usaDocena() ? `<td data-label="Docena" class="col-docena"><button type="button" class="interr chico" data-accion="docena" aria-pressed="${Boolean(p.docena)}" aria-label="Por docena">x12</button></td>` : ''}
         <td data-label="Precio" class="num calc col-precio" data-c="precio">${c.precio}</td>
         <td data-label="Ganas c/u" class="num calc col-ganas" data-c="ganas">${c.ganas}</td>
-        <td data-label="Clave" class="calc col-clave" data-c="clave">${c.clave}</td>
+        <td data-label="Clave" class="col-clave"><input class="clave" data-campo="clave" value="${esc(p.clave ?? '')}" placeholder="Tu clave" aria-label="Clave del cuaderno" autocomplete="off"></td>
         <td class="col-quitar"><button type="button" class="quitar" data-accion="quitar" aria-label="Quitar ${esc(p.nombre)}">✕</button></td>
     </tr>`;
 }
@@ -261,6 +261,8 @@ $('lista').addEventListener('input', (e) => {
     else if (campo === 'costo') p.costo = num(v);
     else if (campo === 'cantidad') p.cantidad = num(v) || null;
     else if (campo === 'flete') p.flete = v.trim();
+    // La clave la escribe ella (10-11): no cambia ninguna cuenta.
+    else if (campo === 'clave') { p.clave = v; guardar(); return; }
     if ((campo === 'costo' || campo === 'cantidad') && p.revisar) { delete p.revisar; tr.querySelector('.revisar')?.remove(); }
     else if (campo === 'pct') { if (v.trim() === '') return; p.pct = num(v); estado.ultimoPct = p.pct; }
     guardar();
@@ -296,10 +298,6 @@ $('lista').addEventListener('click', async (e) => {
         guardar(); pintarTodo();
         avisar(`Quitaste «${p.nombre}».`, () => { estado.productos = antes; guardar(); pintarTodo(); });
     }
-    if (accion === 'clave') {
-        const r = resultado(p);
-        if (r) { await copiarTexto(clave(p.costo, r.porcentaje)); avisar('Clave copiada.'); }
-    }
 });
 
 $('flete').addEventListener('input', (e) => {
@@ -325,7 +323,7 @@ $('excel').addEventListener('click', async () => {
     try {
         const XLSX = await cargarXlsx();
         const hoy = new Date();
-        const { columnas, filas, totales } = filasExcel(estado.productos, estado.regla, num(estado.flete), hoy);
+        const { columnas, filas, totales } = filasExcel(estado.productos, estado.regla, num(estado.flete));
         const aoa = [columnas, ...filas];
         if (totales) {
             aoa.push([]);
@@ -366,7 +364,7 @@ async function copiarTexto(t) {
     }
 }
 $('copiar-todo').addEventListener('click', async () => {
-    const filas = estado.productos.map((p) => ({ nombre: p.nombre, costo: p.costo, r: resultado(p) })).filter((f) => f.r);
+    const filas = estado.productos.map((p) => ({ nombre: p.nombre, clave: p.clave, r: resultado(p) })).filter((f) => f.r);
     await copiarTexto(textoParaCopiar(filas));
     avisar(`Copiaste ${filas.length} ${filas.length === 1 ? 'precio' : 'precios'}.`);
 });
@@ -547,10 +545,8 @@ function pintarRegla() {
     pintarEjemplos();
     $('regla-docena-on').checked = R.usaDocena === true;
     $('regla-docena-detalle').hidden = R.usaDocena !== true;
-    $('regla-8-on').checked = R.terminaEn8On !== false;
     $('regla-suelto').value = R.recargoSuelto;
     $('regla-al-sol').value = R.redondeoAlSolDesde;
-    $('regla-en-8').value = R.terminaEn8Desde;
     $('regla-factura').checked = R.conFactura;
     $('regla-tarjeta-siempre').checked = R.tarjetaSiempre !== false;
     $('regla-tarjeta').value = R.tarjeta;
@@ -559,10 +555,8 @@ $('abrir-regla').addEventListener('click', () => { pintarRegla(); dRegla.showMod
 dRegla.addEventListener('input', (e) => {
     const t = e.target, R = estado.regla;
     if (t.id === 'regla-docena-on') { R.usaDocena = t.checked; $('regla-docena-detalle').hidden = !t.checked; guardar(); pintarTodo(); return; }
-    if (t.id === 'regla-8-on') R.terminaEn8On = t.checked;
-    else if (t.id === 'regla-suelto') R.recargoSuelto = num(t.value);
+    if (t.id === 'regla-suelto') R.recargoSuelto = num(t.value);
     else if (t.id === 'regla-al-sol') R.redondeoAlSolDesde = num(t.value);
-    else if (t.id === 'regla-en-8') R.terminaEn8Desde = num(t.value) || 1e9;
     else if (t.id === 'regla-factura') R.conFactura = t.checked;
     else if (t.id === 'regla-tarjeta-siempre') R.tarjetaSiempre = t.checked;
     else if (t.id === 'regla-tarjeta') R.tarjeta = num(t.value);

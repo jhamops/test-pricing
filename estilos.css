@@ -410,7 +410,7 @@ textarea {
 .tabla td[data-c="precio"] b { color: var(--ok); font-size: 1.15rem; }
 .tabla .calc small, .tabla td small { display: block; color: var(--texto-3); font-weight: 600; font-size: .8rem; white-space: nowrap; }
 .tabla td .calc small { margin-top: 2px; }
-.tabla .clave { min-height: 36px; padding: 0 8px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .9rem; white-space: nowrap; }
+.tabla .clave { width: 120px; min-height: 40px; padding: 0 8px; border: 1px solid var(--borde); border-radius: 10px; background: var(--superficie); color: var(--texto); font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .95rem; }
 .tabla .quitar { width: 40px; height: 40px; }
 .tabla .fila.nuevo { animation: aparecer .35s ease; }
 .paso-pct { display: inline-flex; align-items: center; gap: 2px; border: 1px solid var(--borde); border-radius: 10px; padding: 2px; }

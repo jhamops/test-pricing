@@ -6,12 +6,12 @@
  * 1. Cuánto le sumas depende de lo que te costó: a lo barato, más porcentaje (si no,
  *    no ganas nada en soles); a lo caro, menos (ya ganas bastante en soles).
  * 2. Lo barato se vende por docena (precio por unidad) y suelto, un poco más caro.
- * 3. Cómo se redondea depende del precio: lo barato a 10 céntimos, lo mediano al sol,
- *    y lo caro termina en 8 (98 en vez de 100): ya trae su rebaja y no se rebaja más.
+ * 3. Cómo se redondea depende del precio: lo barato a 10 céntimos y lo demás al sol.
+ *    (El «terminado en 8» se quitó el 10-11: la dueña no lo usa.)
  * 4. Un producto con mucha competencia lleva menos; uno que se vende solo, más.
  *
- * La clave es la del cuaderno: mes · costo («/» en vez del punto) · año · porcentaje.
- *   03 | 10 | 26 | 50  →  marzo, costó S/ 10, 2026, le suma 50 %.
+ * La clave del cuaderno la escribe ella en cada producto (10-11): antes se armaba sola
+ * (mes · costo · año · %), y no era la suya.
  */
 
 export const REGLA_INICIAL = {
@@ -31,8 +31,6 @@ export const REGLA_INICIAL = {
     docenaHasta: 18, // lo que cuesta menos que esto se vende por docena y suelto
     recargoSuelto: 15, // el suelto, este % más que la unidad por docena
     redondeoAlSolDesde: 10, // desde este precio se redondea al sol (antes, a 10 céntimos)
-    terminaEn8On: true, // ¿lo caro termina en 8? (opcional: es decisión de cada negocio)
-    terminaEn8Desde: 100, // desde este precio termina en 8
     ajustes: { competencia: -10, rentable: 15 }, // puntos que se restan o suman al %
     conFactura: true, // compra con factura y paga IGV: la ganancia se mide sin IGV
     // La comisión del POS (Culqi) va SIEMPRE dentro del precio, pague como pague: el
@@ -48,16 +46,8 @@ const r2 = (n) => Math.round(n * 100) / 100;
 /** Al múltiplo más cercano (0.10, 0.50, 1). */
 export const redondear = (n, paso) => r2(Math.round(r2(n / paso)) * paso);
 
-/** El número terminado en 8 más cercano: 203.85 → 208, 196.25 → 198, 337.50 → 338. */
-export function terminadoEn8(x) {
-    const abajo = Math.floor((x - 8) / 10) * 10 + 8;
-    const arriba = abajo + 10;
-    return x - abajo <= arriba - x ? abajo : arriba;
-}
-
 /** El precio redondeado como lo haría ella, según cuánto es. */
 export function redondearPrecio(x, regla) {
-    if (regla.terminaEn8On !== false && x >= regla.terminaEn8Desde) return terminadoEn8(x);
     if (x >= regla.redondeoAlSolDesde) return Math.round(x);
     return redondear(x, 0.1);
 }
@@ -124,15 +114,6 @@ export const fleteDelProducto = (fleteTotal, cantidad) => {
     if (total <= 0) return 0;
     return total / (Number(cantidad) > 0 ? Number(cantidad) : 1);
 };
-
-/** La clave del cuaderno: «03 10 26 50». */
-export function clave(costo, porcentaje, fecha = new Date()) {
-    const mes = String(fecha.getMonth() + 1).padStart(2, '0');
-    const anio = String(fecha.getFullYear()).slice(-2);
-    const c = Number(costo);
-    const texto = Number.isInteger(c) ? String(c) : String(r2(c)).replace('.', '/');
-    return `${mes} ${texto} ${anio} ${Math.round(porcentaje)}`;
-}
 
 /** Flete por unidad: lo que costó el flete entre todas las unidades que llegaron. */
 export function fletePorUnidad(fleteTotal, productos) {
@@ -431,13 +412,13 @@ export function leerLista(texto, { foto = false } = {}) {
 export const leerPegado = (texto) => leerLista(texto).productos;
 
 /** El texto para copiar (WhatsApp, cuaderno). */
-export function textoParaCopiar(filas, fecha = new Date()) {
+export function textoParaCopiar(filas) {
     const s = (n) => `S/ ${Number(n).toFixed(2)}`;
-    return filas.map(({ nombre, costo, r }) => {
+    return filas.map(({ nombre, clave, r }) => {
         const partes = [nombre];
         if (r.porDocena) partes.push(`docena ${s(r.docena)} (${s(r.docenaUnidad)} c/u)`, `suelto ${s(r.suelto)}`);
         else partes.push(`precio ${s(r.suelto)}`);
-        partes.push(`clave ${clave(costo, r.porcentaje, fecha)}`);
+        if (String(clave ?? '').trim()) partes.push(`clave ${String(clave).trim()}`);
         return partes.join(' · ');
     }).join('\n');
 }
@@ -456,7 +437,7 @@ export const COLUMNAS_EXCEL = [
     'Producto', 'Precio de compra', 'Cantidad', 'Flete c/u', 'Costo con flete', '% ganancia', 'Tarjeta %',
     'Docena c/u', 'Docena (x12)', 'Precio suelto', 'Ganas c/u', 'Te queda c/u (sin IGV)', 'Clave',
 ];
-export function filasExcel(productos, regla, fleteGlobal = 0, fecha = new Date()) {
+export function filasExcel(productos, regla, fleteGlobal = 0) {
     const tarjeta = regla.tarjetaSiempre === false ? 0 : Number(regla.tarjeta) || 0;
     const filas = [];
     let invertido = 0, ganas = 0, queda = 0, conCantidad = 0;
@@ -468,7 +449,7 @@ export function filasExcel(productos, regla, fleteGlobal = 0, fecha = new Date()
         filas.push([
             p.nombre, r2(Number(p.costo)), n, r2(r.costoConFlete - Number(p.costo)), r.costoConFlete, r.porcentaje, tarjeta,
             r.porDocena ? r.docenaUnidad : null, r.porDocena ? r.docena : null, r.suelto, ganaUnidad, r.teQueda,
-            clave(p.costo, r.porcentaje, fecha),
+            String(p.clave ?? '').trim() || null,
         ]);
         if (n) {
             conCantidad += 1;

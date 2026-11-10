@@ -1,7 +1,7 @@
 // node --test   (sin dependencias)
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { PORCENTAJES, REGLA_INICIAL as R, calcular, clave, escalonDe, fleteDelProducto, fletePorUnidad, leerLista, leerPegado, porcentajeDe, redondearPrecio, terminadoEn8, textoParaCopiar } from './precios.js';
+import { PORCENTAJES, REGLA_INICIAL as R, calcular, escalonDe, filasExcel, fleteDelProducto, fletePorUnidad, leerLista, leerPegado, porcentajeDe, redondearPrecio, textoParaCopiar } from './precios.js';
 const SIN_TARJETA = { ...R, tarjetaSiempre: false };
 import { DOCENA, SUELTO } from './precios-reales.js';
 
@@ -19,18 +19,11 @@ test('competencia resta y rentable suma', () => {
     assert.equal(porcentajeDe(12, R, 'rentable'), 55);
 });
 
-test('terminado en 8: el más cercano (ya trae su rebaja)', () => {
-    assert.equal(terminadoEn8(203.85), 208);
-    assert.equal(terminadoEn8(196.25), 198);
-    assert.equal(terminadoEn8(208.75), 208);
-    assert.equal(terminadoEn8(337.5), 338);
-    assert.equal(terminadoEn8(100), 98);
-});
-
 test('el redondeo depende del precio', () => {
     assert.equal(redondearPrecio(4.36, R), 4.4); // lo barato, a 10 céntimos
     assert.equal(redondearPrecio(64.7, R), 65); // lo mediano, al sol
-    assert.equal(redondearPrecio(129.6, R), 128); // lo caro, termina en 8
+    assert.equal(redondearPrecio(129.6, R), 130); // lo caro, al sol (sin «terminado en 8» desde el 10-11)
+    assert.equal(redondearPrecio(203.85, R), 204);
 });
 
 test('lo barato sale por docena y suelto; lo caro, un solo precio', () => {
@@ -42,12 +35,12 @@ test('lo barato sale por docena y suelto; lo caro, un solo precio', () => {
     const caro = calcular({ costo: 160 }, SIN_TARJETA);
     assert.equal(caro.porDocena, false);
     assert.equal(caro.docena, null);
-    assert.equal(caro.suelto, 198); // 160 + 25 % = 200 → el terminado en 8 más cercano
+    assert.equal(caro.suelto, 200); // 160 + 25 % = 200
 });
 
 test('la comisión de tarjeta va siempre dentro del precio (dividiendo, no sumando)', () => {
-    const sin = calcular({ costo: 100 }, { ...SIN_TARJETA, terminaEn8Desde: 1e9 });
-    const con = calcular({ costo: 100 }, { ...R, terminaEn8Desde: 1e9 });
+    const sin = calcular({ costo: 100 }, SIN_TARJETA);
+    const con = calcular({ costo: 100 }, R);
     assert.equal(sin.sinRedondear, 140);
     assert.equal(con.sinRedondear, 144.33); // 140 / 0.97
     assert.equal(con.comision, 4.32); // 3 % de 144
@@ -58,7 +51,7 @@ test('la comisión de tarjeta va siempre dentro del precio (dividiendo, no suman
 });
 
 test('sus 38 precios reales: la regla general se equivoca poco (y avisa si empeora)', () => {
-    // Con la regla tal como sale por defecto (tarjeta adentro, docena, terminado en 8).
+    // Con la regla tal como sale por defecto (tarjeta adentro, docena).
     const datos = [...DOCENA.map(([c, p]) => ({ c, p })), ...SUELTO.map(([c, p]) => ({ c, p }))];
     const errores = datos.map(({ c, p }) => {
         const r = calcular({ costo: c }, R);
@@ -73,13 +66,13 @@ test('sus 38 precios reales: la regla general se equivoca poco (y avisa si empeo
 
 test('lo que le queda: con factura se descuenta el IGV (y la comisión)', () => {
     const r = calcular({ costo: 160 }, SIN_TARJETA);
-    assert.equal(r.ganas, 38);
-    assert.equal(r.teQueda, 32.2); // 38 / 1.18
-    assert.equal(calcular({ costo: 160 }, { ...SIN_TARJETA, conFactura: false }).teQueda, 38);
-    const conTarjeta = calcular({ costo: 160 }, R); // 160 × 1.25 / 0.97 = 206.19 → 208
-    assert.equal(conTarjeta.suelto, 208);
-    assert.equal(conTarjeta.comision, 6.24);
-    assert.equal(conTarjeta.teQueda, 34.44); // 48 / 1.18 − 6.24
+    assert.equal(r.ganas, 40);
+    assert.equal(r.teQueda, 33.9); // 40 / 1.18
+    assert.equal(calcular({ costo: 160 }, { ...SIN_TARJETA, conFactura: false }).teQueda, 40);
+    const conTarjeta = calcular({ costo: 160 }, R); // 160 × 1.25 / 0.97 = 206.19 → 206
+    assert.equal(conTarjeta.suelto, 206);
+    assert.equal(conTarjeta.comision, 6.18);
+    assert.equal(conTarjeta.teQueda, 32.8); // 46 / 1.18 − 6.18
 });
 
 test('el flete se reparte entre las unidades y sube el precio', () => {
@@ -92,10 +85,13 @@ test('el flete se reparte entre las unidades y sube el precio', () => {
     assert.equal(fleteDelProducto('', 5), 0);
 });
 
-test('la clave del cuaderno', () => {
-    const marzo = new Date(2026, 2, 26);
-    assert.equal(clave(10, 50, marzo), '03 10 26 50');
-    assert.equal(clave(9.6, 45, marzo), '03 9/6 26 45');
+test('la clave la escribe ella: va tal cual al copiar y al Excel, y vacía no sale (10-11)', () => {
+    const r = calcular({ costo: 160 }, SIN_TARJETA);
+    assert.equal(textoParaCopiar([{ nombre: 'Guitarra', clave: ' AB-12 ', r }]), 'Guitarra · precio S/ 200.00 · clave AB-12');
+    assert.equal(textoParaCopiar([{ nombre: 'Guitarra', clave: '', r }]), 'Guitarra · precio S/ 200.00');
+    const { filas } = filasExcel([{ nombre: 'Guitarra', costo: 160, pct: 25, clave: 'AB-12' }, { nombre: 'Pelota', costo: 30, pct: 40 }], SIN_TARJETA);
+    assert.equal(filas[0].at(-1), 'AB-12');
+    assert.equal(filas[1].at(-1), null);
 });
 
 test('pegar varios productos de una vez', () => {
@@ -155,24 +151,23 @@ test('pegar: de una factura entera se saltan encabezado, totales y pie', () => {
 });
 
 test('texto para copiar', () => {
-    const marzo = new Date(2026, 2, 1);
     const t = textoParaCopiar([
-        { nombre: 'Cono', costo: 3, r: calcular({ costo: 3 }, SIN_TARJETA) },
-        { nombre: 'Guitarra', costo: 160, r: calcular({ costo: 160 }, SIN_TARJETA) },
-    ], marzo);
-    assert.equal(t, 'Cono · docena S/ 57.60 (S/ 4.80 c/u) · suelto S/ 5.50 · clave 03 3 26 60\nGuitarra · precio S/ 198.00 · clave 03 160 26 25');
+        { nombre: 'Cono', clave: 'C3', r: calcular({ costo: 3 }, SIN_TARJETA) },
+        { nombre: 'Guitarra', r: calcular({ costo: 160 }, SIN_TARJETA) },
+    ]);
+    assert.equal(t, 'Cono · docena S/ 57.60 (S/ 4.80 c/u) · suelto S/ 5.50 · clave C3\nGuitarra · precio S/ 200.00');
 });
 
 test('el flete se suma tal cual, sin ganancia encima (su ejemplo: 100 + 30 % + 2 = 132)', () => {
-    const suya = { ...SIN_TARJETA, escalera: [{ hasta: null, pct: 30 }], porDocenaOn: false, terminaEn8On: false };
+    const suya = { ...SIN_TARJETA, escalera: [{ hasta: null, pct: 30 }], porDocenaOn: false };
     assert.equal(calcular({ costo: 100, flete: 2 }, suya).suelto, 132);
     // Con la tarjeta siempre adentro: 132 / 0.97 = 136.08 → 136.
     assert.equal(calcular({ costo: 100, flete: 2 }, { ...suya, tarjetaSiempre: true }).suelto, 136);
 });
 
-test('terminar en 8 es opcional', () => {
-    assert.equal(redondearPrecio(203.85, R), 208);
-    assert.equal(redondearPrecio(203.85, { ...R, terminaEn8On: false }), 204); // al sol
+test('ya no hay «terminado en 8», aunque venga prendido de lo guardado en su equipo (10-11)', () => {
+    assert.equal(redondearPrecio(203.85, { ...R, terminaEn8On: true, terminaEn8Desde: 100 }), 204);
+    assert.equal(calcular({ costo: 160 }, { ...SIN_TARJETA, terminaEn8On: true, terminaEn8Desde: 100 }).suelto, 200);
 });
 
 test('sacar precio por docena es opcional', () => {
@@ -185,8 +180,8 @@ test('sacar precio por docena es opcional', () => {
 
 test('el porcentaje que ella toca manda (de 5 en 5, o cualquiera)', () => {
     assert.deepEqual([PORCENTAJES.length, PORCENTAJES[0], PORCENTAJES.at(-1)], [15, 15, 85]);
-    // Su caso: costó 73, le pone 50 % → 110 (sin la tarjeta ni el 8, como su cuaderno).
-    const suya = { ...SIN_TARJETA, terminaEn8On: false };
+    // Su caso: costó 73, le pone 50 % → 110 (sin la tarjeta, como su cuaderno).
+    const suya = SIN_TARJETA;
     assert.equal(calcular({ costo: 73, pct: 50 }, suya).suelto, 110);
     assert.equal(calcular({ costo: 73, pct: 50 }, suya).porcentaje, 50);
     assert.equal(calcular({ costo: 73, pct: 37 }, suya).porcentaje, 37); // uno aparte, cualquiera
@@ -195,20 +190,19 @@ test('el porcentaje que ella toca manda (de 5 en 5, o cualquiera)', () => {
 
 test('la hoja de Excel: una fila por producto, números como números, y los totales', async () => {
     const { filasExcel, COLUMNAS_EXCEL } = await import('./precios.js');
-    const marzo = new Date(2026, 2, 1);
     const productos = [
-        { nombre: 'Scooter', costo: 85, cantidad: 2, flete: '4', pct: 45 },
+        { nombre: 'Scooter', costo: 85, cantidad: 2, flete: '4', pct: 45, clave: 'SC-85' },
         { nombre: 'Cono', costo: 3, cantidad: 24, flete: '', pct: 50, docena: true },
         { nombre: 'Sin cantidad', costo: 10, cantidad: null, flete: '', pct: 40 },
     ];
-    const { columnas, filas, totales } = filasExcel(productos, SIN_TARJETA, 26, marzo);
+    const { columnas, filas, totales } = filasExcel(productos, SIN_TARJETA, 26);
     assert.deepEqual(columnas, COLUMNAS_EXCEL);
     assert.equal(filas.length, 3);
     // Scooter: su flete 4 / 2 = 2 c/u, más 26 / 26 unidades = 1 → 3 c/u; costo con flete 88.
     const [scooter, cono, sinCant] = filas;
     assert.deepEqual(scooter.slice(0, 7), ['Scooter', 85, 2, 3, 88, 45, 0]);
     assert.equal(scooter[9], calcular({ costo: 85, pct: 45, flete: 3 }, SIN_TARJETA).suelto);
-    assert.equal(scooter[12], '03 85 26 45');
+    assert.equal(scooter[12], 'SC-85');
     assert.equal(typeof cono[8], 'number'); // la docena, como número
     assert.equal(cono[3], 1); // 26 / 26 unidades
     assert.equal(sinCant[2], null); // sin cantidad: celda vacía y sin flete de la compra

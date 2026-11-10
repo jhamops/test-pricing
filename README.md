@@ -1,7 +1,7 @@
 # Calculadora de precios · hecho por ILLAK
 
 Escribe lo que te costó y te dice a cuánto venderlo **por docena** y **suelto**, cuánto ganas,
-cuánto te queda después del IGV y la **clave del cuaderno** (`mes costo año %`, p. ej. `03 10 26 50`).
+cuánto te queda después del IGV y deja escribir la **clave del cuaderno** de cada producto (la escribe ella; no se calcula).
 
 - Precio de compra → tarjeta → flete → **ganancia** (botones de 5 en 5, de 15 a 85, u «Otro»).
   El precio cambia al momento. Sin sugerencias: la ganancia la elige ella (se recuerda la última).
@@ -13,7 +13,7 @@ cuánto te queda después del IGV y la **clave del cuaderno** (`mes costo año %
   carga solo al tocar el botón.
 - La tarjeta (3 %) va siempre dentro del precio (se divide entre 0.97); el flete se suma sin ganancia.
 - **Por docena solo si ella lo marca** («Por docena» al llenar, «x12» en cada fila): sale la docena
-  c/u y el suelto. Si no, un solo precio. Lo caro termina en 8 (opcional en ⚙).
+  c/u y el suelto. Si no, un solo precio.
 - Se guarda solo en el equipo (misma dirección = mismos datos, aunque se actualice la página).
 
 ## Archivos
